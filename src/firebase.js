@@ -3,12 +3,12 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAZFi4Xfpv3wYvs7xhEjJuegEEW6awQh_0",
-  authDomain: "bhukker-transport.firebaseapp.com",
-  projectId: "bhukker-transport",
-  storageBucket: "bhukker-transport.firebasestorage.app",
-  messagingSenderId: "559074068683",
-  appId: "1:559074068683:web:b4015a930ccf1cd22e734e"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
