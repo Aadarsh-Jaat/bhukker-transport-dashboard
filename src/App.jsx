@@ -23,6 +23,7 @@ const defaultData = {
   drivers: [],
   cashbook: [],
   payments: [],
+  openingPending: [],
   expenses: [], // Keep for backward compatibility
   driverAdvances: [],
   // NEW: General Expenses (non-trip expenses)
@@ -77,6 +78,7 @@ function useStorage(user) {
             },
             generalExpenses: saved.generalExpenses || [],
             staffSalaries: saved.staffSalaries || [],
+            openingPending: saved.openingPending || [],
             ownerDrawings: saved.ownerDrawings || []
           });
         } else {
@@ -1908,11 +1910,16 @@ function PaymentsPage({ data, update }) {
   );
 }
 
-function PendingPage({ data }) {
+function PendingPage({ data, update }) {
   const [month, setMonth] = useState("");
   const [partyF, setPartyF] = useState("");
   const [daysF, setDaysF] = useState("");
-
+  const [showOpeningForm, setShowOpeningForm] = useState(false);
+const [openingForm, setOpeningForm] = useState({
+  partyName: "",
+  amount: 0,
+  remarks: "Before May 2026"
+});
   const today = new Date().toISOString().slice(0,10);
   const daysDiff = (date) => {
     if (!date) return 0;
@@ -1929,12 +1936,91 @@ function PendingPage({ data }) {
   const parties = [...new Set(data.trips.filter(t=>(Number(t.pending)||0)>0).map(t=>t.partyName).filter(Boolean))];
   const total = pending.reduce((s,t)=>s+(Number(t.pending)||0),0);
 
+  const openingTotal = (data.openingPending || []).reduce(
+  (s, x) => s + (Number(x.amount) || 0),
+  0
+);
+
+const grandTotal = total + openingTotal;
+  const saveOpeningPending = () => {
+  if (!openingForm.partyName || !openingForm.amount) {
+    return alert("Party and amount required");
+  }
+
+  const list = [
+    ...(data.openingPending || []),
+    {
+      ...openingForm,
+      id: genId(),
+      amount: Number(openingForm.amount),
+      createdAt: new Date().toISOString()
+    }
+  ];
+
+  update("openingPending", list);
+
+  setOpeningForm({
+    partyName: "",
+    amount: 0,
+    remarks: "Before May 2026"
+  });
+
+  setShowOpeningForm(false);
+};
+
+const deleteOpeningPending = (id) => {
+  if (!confirm("Delete opening pending?")) return;
+  update(
+    "openingPending",
+    (data.openingPending || []).filter(x => x.id !== id)
+  );
+};
+
   return (
     <div>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <h2 style={{margin:0,fontSize:22,fontWeight:700,color:"#1a1a2e"}}>Pending Payments</h2>
-        <Badge color="red">Total Pending: {fmt(total)}</Badge>
+        <div style={{display:"flex",gap:10,alignItems:"center"}}>
+  <Badge color="orange">Opening Pending: {fmt(openingTotal)}</Badge>
+  <Badge color="red">Current Pending: {fmt(total)}</Badge>
+  <Badge color="blue">Total Receivable: {fmt(grandTotal)}</Badge>
+</div>
       </div>
+
+      <Card style={{marginBottom:16}}>
+  <div style={{fontWeight:700,fontSize:15,marginBottom:14}}>
+    Opening Pending / Previous Outstanding
+  </div>
+
+  {(data.openingPending || []).length === 0 ? (
+    <EmptyState text="No opening pending added" />
+  ) : (
+    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+      <thead>
+        <tr style={{background:"#f8f8f8",borderBottom:"2px solid #eee"}}>
+          <th style={{padding:"10px 12px",textAlign:"left"}}>Party</th>
+          <th style={{padding:"10px 12px",textAlign:"right"}}>Amount</th>
+          <th style={{padding:"10px 12px",textAlign:"left"}}>Remarks</th>
+          <th style={{padding:"10px 12px"}}></th>
+        </tr>
+      </thead>
+      <tbody>
+        {(data.openingPending || []).map(x => (
+          <tr key={x.id} style={{borderBottom:"1px solid #f0f0f0"}}>
+            <td style={{padding:"10px 12px",fontWeight:600}}>{x.partyName}</td>
+            <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:"#c62828"}}>
+              {fmt(x.amount)}
+            </td>
+            <td style={{padding:"10px 12px",color:"#666"}}>{x.remarks}</td>
+            <td style={{padding:"10px 12px",textAlign:"right"}}>
+              <Btn small danger onClick={() => deleteOpeningPending(x.id)}>Del</Btn>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )}
+</Card>
 
       <Card style={{marginBottom:16}}>
         <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
@@ -1951,6 +2037,9 @@ function PendingPage({ data }) {
             <option value="15">More than 15 days</option>
             <option value="30">More than 30 days</option>
           </select>
+          <Btn onClick={() => setShowOpeningForm(true)} color="#6a1b9a">
+  + Add Opening Pending
+</Btn>
         </div>
       </Card>
 
@@ -1986,6 +2075,42 @@ function PendingPage({ data }) {
           </table>
         )}
       </Card>
+      <Modal
+  open={showOpeningForm}
+  onClose={() => setShowOpeningForm(false)}
+  title="Add Opening Pending"
+>
+  <Input
+    label="Party Name"
+    value={openingForm.partyName}
+    onChange={e=>setOpeningForm(p=>({...p,partyName:e.target.value}))}
+    list="opening-party-list"
+  />
+
+  <datalist id="opening-party-list">
+    {data.parties.map(p => (
+      <option key={p.id} value={p.name} />
+    ))}
+  </datalist>
+
+  <Input
+    label="Pending Amount (₹)"
+    type="number"
+    value={openingForm.amount}
+    onChange={e=>setOpeningForm(p=>({...p,amount:e.target.value}))}
+  />
+
+  <Textarea
+    label="Remarks"
+    value={openingForm.remarks}
+    onChange={e=>setOpeningForm(p=>({...p,remarks:e.target.value}))}
+  />
+
+  <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:8}}>
+    <Btn outline onClick={() => setShowOpeningForm(false)}>Cancel</Btn>
+    <Btn onClick={saveOpeningPending}>Save Opening Pending</Btn>
+  </div>
+</Modal>
     </div>
   );
 }
@@ -3943,7 +4068,7 @@ if (authLoading || loading) {
           {page==="transporters"&&<TransportersPage data={data} update={update} />}
           {page==="cashbook"&&<CashbookPage data={data} update={update} openAdd={pageAction==="add"} />}
           {page==="payments"&&<PaymentsPage data={data} update={update} />}
-          {page==="pending"&&<PendingPage data={data} />}
+          {page==="pending"&&<PendingPage data={data} update={update} />}
           {page==="invoices"&&<InvoicePage data={data} update={update} />}
           {page==="trucks"&&<TrucksPage data={data} update={update} />}
           {page==="drivers"&&<DriversPage data={data} update={update} />}
