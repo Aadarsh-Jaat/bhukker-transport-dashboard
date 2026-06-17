@@ -24,13 +24,10 @@ const defaultData = {
   cashbook: [],
   payments: [],
   openingPending: [],
-  expenses: [], // Keep for backward compatibility
+  expenses: [],
   driverAdvances: [],
-  // NEW: General Expenses (non-trip expenses)
   generalExpenses: [],
-  // NEW: Staff salaries (separate from driver advances)
   staffSalaries: [],
-  // NEW: Owner's drawings/expenses
   ownerDrawings: [],
   settings: {
     companyName: "BHUKKER TRANSPORT CO.",
@@ -39,9 +36,8 @@ const defaultData = {
     phone: "9812081416",
     address: "Shop No 135, New Sabzi Mandi, Panipat-132103, Haryana",
     jurisdiction: "Subject to Panipat Jurisdiction only",
-    // NEW settings
     ownerName: "Owner",
-    monthlyOwnerSalary: 0, // If owner wants to track theoretical salary
+    monthlyOwnerSalary: 0,
   },
   invoiceCounter: 1,
 };
@@ -51,9 +47,9 @@ function useStorage(user) {
   const [loading, setLoading] = useState(true);
 
   const getDataRef = () => {
-  if (!user) return null;
-  return doc(db, "users", user.uid);
-};
+    if (!user) return null;
+    return doc(db, "users", user.uid);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -419,9 +415,8 @@ function TripForm({ initial, parties, trucks, drivers, transporters, onSave, onC
 }
 
 // ============================================================
-// PAGES
+// DASHBOARD
 // ============================================================
-
 function Dashboard({ data, selectedMonth, setSelectedMonth, navigate }) {
   const trips = data.trips.filter(t => tripMonth(t) === selectedMonth);
   const cash = data.cashbook.filter(c => c.date?.slice(0,7) === selectedMonth);
@@ -441,10 +436,16 @@ function Dashboard({ data, selectedMonth, setSelectedMonth, navigate }) {
   const recentTrips = [...data.trips].sort((a,b)=>b.date?.localeCompare(a.date)).slice(0,5);
   const recentPayments = [...data.payments].sort((a,b)=>b.date?.localeCompare(a.date)).slice(0,5);
 
-  const today = new Date().toISOString().slice(0,10);
-  const expiring = data.trucks.filter(t=>{
-    const docs = [t.insuranceExpiry,t.fitnessExpiry,t.permitExpiry,t.pollutionExpiry];
-    return docs.some(d=>d && d <= new Date(Date.now()+30*864e5).toISOString().slice(0,10));
+  const expiring = data.trucks.filter(t => {
+    const docs = [
+      { name: "Insurance", date: t.insuranceExpiry },
+      { name: "Fitness", date: t.fitnessExpiry },
+      { name: "Permit", date: t.permitExpiry },
+      { name: "National Permit", date: t.nationalPermitExpiry },
+      { name: "Pollution", date: t.pollutionExpiry },
+      { name: "Tax", date: t.taxExpiry }
+    ];
+    return docs.some(d => d.date && d.date <= new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10));
   });
 
   const partyPending = {};
@@ -456,9 +457,7 @@ function Dashboard({ data, selectedMonth, setSelectedMonth, navigate }) {
   const topParties = Object.entries(partyPending).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
   return (
-    
     <div>
-
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24,flexWrap:"wrap",gap:12}}>
         <div>
           <h2 style={{margin:0,fontSize:22,fontWeight:700,color:"#1a1a2e"}}>Dashboard</h2>
@@ -544,26 +543,32 @@ function Dashboard({ data, selectedMonth, setSelectedMonth, navigate }) {
           )}
         </Card>
         <Card>
-          <div style={{fontWeight:700,fontSize:15,marginBottom:14,color:"#1a1a2e"}}>⚠ Expiring Documents</div>
-          {expiring.length===0
-            ? <div style={{color:"#2e7d32",fontSize:14,padding:"1rem 0"}}>✓ All documents valid</div>
-            : expiring.map(t=>(
-              <div key={t.id} style={{padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
-                <div style={{fontWeight:600}}>{t.number}</div>
-                <div style={{fontSize:12,color:"#e65100"}}>
-                  {t.insuranceExpiry<=new Date(Date.now()+30*864e5).toISOString().slice(0,10)
-                    && `Insurance: ${t.insuranceExpiry} `}
-                  {t.fitnessExpiry<=new Date(Date.now()+30*864e5).toISOString().slice(0,10)
-                    && `Fitness: ${t.fitnessExpiry}`}
+          <div style={{fontWeight:700,fontSize:15,marginBottom:14,color:"#1a1a2e"}}>⚠️ Expiring Documents</div>
+          {expiring.length === 0 ? (
+            <div style={{ color: "#2e7d32", fontSize: 14, padding: "1rem 0" }}>✓ All documents valid</div>
+          ) : (
+            expiring.map(t => (
+              <div key={t.id} style={{ padding: "8px 0", borderBottom: "1px solid #f5f5f5" }}>
+                <div style={{ fontWeight: 600 }}>{t.number}</div>
+                <div style={{ fontSize: 12, color: "#e65100" }}>
+                  {t.insuranceExpiry && t.insuranceExpiry <= new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) && `Insurance: ${t.insuranceExpiry} `}
+                  {t.fitnessExpiry && t.fitnessExpiry <= new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) && `Fitness: ${t.fitnessExpiry} `}
+                  {t.permitExpiry && t.permitExpiry <= new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) && `Permit: ${t.permitExpiry} `}
+                  {t.nationalPermitExpiry && t.nationalPermitExpiry <= new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) && `National Permit: ${t.nationalPermitExpiry} `}
+                  {t.pollutionExpiry && t.pollutionExpiry <= new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10) && `Pollution: ${t.pollutionExpiry}`}
                 </div>
               </div>
-          ))}
+            ))
+          )}
         </Card>
       </div>
     </div>
   );
 }
 
+// ============================================================
+// TRIPS PAGE
+// ============================================================
 function TripsPage({ data, update, navigate, openAdd }) {
   const [month, setMonth] = useState(currentMonth);
   const [search, setSearch] = useState("");
@@ -573,6 +578,10 @@ function TripsPage({ data, update, navigate, openAdd }) {
   const [showForm, setShowForm] = useState(openAdd||false);
   const [editing, setEditing] = useState(null);
   const [viewTrip, setViewTrip] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedTripForPayment, setSelectedTripForPayment] = useState(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0,10));
 
   useEffect(()=>{ if(openAdd) setShowForm(true); },[openAdd]);
 
@@ -590,15 +599,88 @@ function TripsPage({ data, update, navigate, openAdd }) {
 
   const saveTrip = (trip) => {
     const trips = [...data.trips];
+    const cashbook = [...(data.cashbook || [])];
+    
     if (editing) {
-      const idx = trips.findIndex(t=>t.id===editing.id);
+      const idx = trips.findIndex(t => t.id === editing.id);
       trips[idx] = { ...editing, ...trip };
+      update("trips", trips);
+      setShowForm(false);
+      setEditing(null);
     } else {
-      trips.push({ ...trip, id: genId() });
+      const newTrip = { ...trip, id: genId() };
+      trips.push(newTrip);
+      const tripId = newTrip.id;
+      const tripDate = newTrip.date;
+      
+      if (newTrip.advance && Number(newTrip.advance) > 0) {
+        cashbook.push({
+          id: genId(), date: tripDate, type: "in", category: "Freight Received",
+          particulars: `Advance received from ${newTrip.partyName} for trip`,
+          related: newTrip.partyName, amount: Number(newTrip.advance), mode: "cash",
+          remarks: `Auto-generated from Trip - Truck: ${newTrip.truckNumber}, From: ${newTrip.from} To: ${newTrip.to}`,
+          source: "trip_advance", tripId: tripId
+        });
+      }
+      if (newTrip.paymentReceived && Number(newTrip.paymentReceived) > 0) {
+        cashbook.push({
+          id: genId(), date: tripDate, type: "in", category: "Freight Received",
+          particulars: `Payment received from ${newTrip.partyName} for trip`,
+          related: newTrip.partyName, amount: Number(newTrip.paymentReceived), mode: "cash",
+          remarks: `Auto-generated from Trip - Truck: ${newTrip.truckNumber}`,
+          source: "trip_payment", tripId: tripId
+        });
+      }
+      if (newTrip.diesel && Number(newTrip.diesel) > 0) {
+        cashbook.push({
+          id: genId(), date: tripDate, type: "out", category: "Diesel",
+          particulars: `Diesel expense for trip`, related: newTrip.truckNumber,
+          amount: Number(newTrip.diesel), mode: "cash",
+          remarks: `Auto-generated from Trip - Truck: ${newTrip.truckNumber}, From: ${newTrip.from} To: ${newTrip.to}`,
+          source: "trip_diesel", tripId: tripId
+        });
+      }
+      if (newTrip.cng && Number(newTrip.cng) > 0) {
+        cashbook.push({
+          id: genId(), date: tripDate, type: "out", category: "CNG",
+          particulars: `CNG expense for trip`, related: newTrip.truckNumber,
+          amount: Number(newTrip.cng), mode: "cash",
+          remarks: `Auto-generated from Trip - Truck: ${newTrip.truckNumber}`,
+          source: "trip_cng", tripId: tripId
+        });
+      }
+      if (newTrip.toll && Number(newTrip.toll) > 0) {
+        cashbook.push({
+          id: genId(), date: tripDate, type: "out", category: "Toll",
+          particulars: `Toll expense for trip`, related: newTrip.truckNumber,
+          amount: Number(newTrip.toll), mode: "cash",
+          remarks: `Auto-generated from Trip - Truck: ${newTrip.truckNumber}`,
+          source: "trip_toll", tripId: tripId
+        });
+      }
+      if (newTrip.driverAdvance && Number(newTrip.driverAdvance) > 0) {
+        cashbook.push({
+          id: genId(), date: tripDate, type: "out", category: "Driver Advance",
+          particulars: `Driver advance for ${newTrip.driverName || "driver"}`,
+          related: newTrip.driverName, amount: Number(newTrip.driverAdvance), mode: "cash",
+          remarks: `Auto-generated from Trip - Truck: ${newTrip.truckNumber}`,
+          source: "trip_driver_advance", tripId: tripId
+        });
+      }
+      if (newTrip.otherExpense && Number(newTrip.otherExpense) > 0) {
+        cashbook.push({
+          id: genId(), date: tripDate, type: "out", category: "Miscellaneous",
+          particulars: `Other expenses for trip`, related: newTrip.truckNumber,
+          amount: Number(newTrip.otherExpense), mode: "cash",
+          remarks: `Auto-generated from Trip - ${newTrip.remarks || ""}`,
+          source: "trip_other", tripId: tripId
+        });
+      }
+      update("cashbook", cashbook);
+      update("trips", trips);
+      setShowForm(false);
+      setEditing(null);
     }
-    update("trips", trips);
-    setShowForm(false);
-    setEditing(null);
   };
 
   const deleteTrip = (id) => {
@@ -606,9 +688,54 @@ function TripsPage({ data, update, navigate, openAdd }) {
     update("trips", data.trips.filter(t=>t.id!==id));
   };
 
+  const markAsPaid = (trip, amountToMark = null, paymentDateValue = null) => {
+    const amount = amountToMark || trip.pending;
+    const paymentDateToUse = paymentDateValue || new Date().toISOString().slice(0,10);
+    if (!amount || amount <= 0) {
+      alert("No pending amount to mark as paid");
+      return;
+    }
+    if (!confirm(`Mark ${fmt(amount)} as received from ${trip.partyName} on ${paymentDateToUse}?`)) return;
+    
+    const trips = [...data.trips];
+    const tripIndex = trips.findIndex(t => t.id === trip.id);
+    const newPaymentReceived = (Number(trip.paymentReceived) || 0) + Number(amount);
+    const newPending = Math.max(0, (Number(trip.freight) || 0) - (Number(trip.advance) || 0) - newPaymentReceived);
+    const newStatus = newPending <= 0 ? "paid" : "partial";
+    trips[tripIndex] = { ...trip, paymentReceived: newPaymentReceived, pending: newPending, paymentStatus: newStatus };
+    
+    const cashbook = [...(data.cashbook || [])];
+    cashbook.push({
+      id: genId(), date: paymentDateToUse, type: "in", category: "Freight Received",
+      particulars: `Payment received from ${trip.partyName} for trip`,
+      related: trip.partyName, amount: Number(amount), mode: "cash",
+      remarks: `Manual payment for trip - Truck: ${trip.truckNumber}, From: ${trip.from} To: ${trip.to}`,
+      source: "manual_payment", tripId: trip.id
+    });
+    update("trips", trips);
+    update("cashbook", cashbook);
+    alert(`Payment of ${fmt(amount)} recorded successfully for ${paymentDateToUse}!`);
+  };
+
+  const openPaymentModal = (trip) => {
+    setSelectedTripForPayment(trip);
+    setPaymentAmount(trip.pending);
+    setPaymentDate(new Date().toISOString().slice(0,10));
+    setShowPaymentModal(true);
+  };
+
+  const processPayment = () => {
+    if (selectedTripForPayment) {
+      markAsPaid(selectedTripForPayment, Number(paymentAmount), paymentDate);
+      setShowPaymentModal(false);
+      setSelectedTripForPayment(null);
+      setPaymentAmount("");
+      setPaymentDate(new Date().toISOString().slice(0,10));
+    }
+  };
+
   const parties = [...new Set(data.trips.map(t=>t.partyName).filter(Boolean))];
   const trucks = [...new Set(data.trips.map(t=>t.truckNumber).filter(Boolean))];
-
   const statusColor = {paid:"green",partial:"orange",pending:"red"};
 
   return (
@@ -654,8 +781,7 @@ function TripsPage({ data, update, navigate, openAdd }) {
               ))}
             </tr></thead>
             <tbody>{filtered.map(t=>(
-              <tr key={t.id} style={{borderBottom:"1px solid #f0f0f0",cursor:"pointer"}}
-                onClick={()=>setViewTrip(t)}>
+              <tr key={t.id} style={{borderBottom:"1px solid #f0f0f0",cursor:"pointer"}} onClick={()=>setViewTrip(t)}>
                 <td style={{padding:"10px 12px",whiteSpace:"nowrap"}}>{t.date}</td>
                 <td style={{padding:"10px 12px",fontWeight:600}}>{t.truckNumber||"-"}</td>
                 <td style={{padding:"10px 12px"}}>{t.driverName||"-"}</td>
@@ -666,9 +792,11 @@ function TripsPage({ data, update, navigate, openAdd }) {
                 <td style={{padding:"10px 12px",textAlign:"right",fontWeight:600,color:(Number(t.pending)||0)>0?"#c62828":"#2e7d32"}}>{fmt(t.pending)}</td>
                 <td style={{padding:"10px 12px"}}><Badge color={statusColor[t.paymentStatus]||"gray"}>{t.paymentStatus}</Badge></td>
                 <td style={{padding:"10px 12px",textAlign:"right"}} onClick={e=>e.stopPropagation()}>
+                  {(Number(t.pending) || 0) > 0 && (
+                    <Btn small outline color="#2e7d32" onClick={() => openPaymentModal(t)} style={{ marginRight: 5 }}>💰 Receive</Btn>
+                  )}
                   <Btn small outline onClick={()=>{setEditing(t);setShowForm(true)}}>Edit</Btn>
-                  {" "}
-                  <Btn small danger onClick={()=>deleteTrip(t.id)}>Del</Btn>
+                  {" "}<Btn small danger onClick={()=>deleteTrip(t.id)}>Del</Btn>
                 </td>
               </tr>
             ))}</tbody>
@@ -685,6 +813,30 @@ function TripsPage({ data, update, navigate, openAdd }) {
 
       <Modal open={!!viewTrip} onClose={()=>setViewTrip(null)} title="Trip Details" wide>
         {viewTrip && <TripDetail trip={viewTrip} />}
+      </Modal>
+
+      <Modal open={showPaymentModal} onClose={() => setShowPaymentModal(false)} title="Receive Payment">
+        {selectedTripForPayment && (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ background: "#f5f5f5", borderRadius: 8, padding: "12px", marginBottom: 12 }}>
+                <div><strong>Party:</strong> {selectedTripForPayment.partyName}</div>
+                <div><strong>Truck:</strong> {selectedTripForPayment.truckNumber}</div>
+                <div><strong>Route:</strong> {selectedTripForPayment.from} → {selectedTripForPayment.to}</div>
+                <div><strong>Total Freight:</strong> {fmt(selectedTripForPayment.freight)}</div>
+                <div><strong>Already Received:</strong> {fmt((Number(selectedTripForPayment.advance) || 0) + (Number(selectedTripForPayment.paymentReceived) || 0))}</div>
+                <div style={{ marginTop: 8, fontSize: 16, fontWeight: 700, color: "#c62828" }}>Pending Amount: {fmt(selectedTripForPayment.pending)}</div>
+              </div>
+              <Input label="Payment Received Date" type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} half />
+              <Input label="Amount to Receive (₹)" type="number" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} half />
+              <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>Max: {fmt(selectedTripForPayment.pending)}</div>
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+              <Btn outline onClick={() => setShowPaymentModal(false)}>Cancel</Btn>
+              <Btn onClick={processPayment} color="#2e7d32">Record Payment & Add to Cash Book</Btn>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
@@ -714,10 +866,8 @@ function TripDetail({ trip }) {
         {[["Diesel",trip.diesel],["CNG",trip.cng],["Toll",trip.toll],
           ["Driver Advance",trip.driverAdvance],["Other",trip.otherExpense]
         ].map(([l,v])=>v>0&&(
-          <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",
-            borderBottom:"1px solid #f0f0f0"}}>
-            <span style={{color:"#666"}}>{l}</span>
-            <span style={{fontWeight:600}}>{fmt(v)}</span>
+          <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"6px 0", borderBottom:"1px solid #f0f0f0"}}>
+            <span style={{color:"#666"}}>{l}</span><span style={{fontWeight:600}}>{fmt(v)}</span>
           </div>
         ))}
         <div style={{display:"flex",justifyContent:"space-between",padding:"8px 0",fontWeight:700}}>
@@ -742,6 +892,9 @@ function TripDetail({ trip }) {
   );
 }
 
+// ============================================================
+// PARTIES PAGE
+// ============================================================
 function PartiesPage({ data, update }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -817,8 +970,7 @@ function PartiesPage({ data, update }) {
                   <div style={{fontWeight:700,color:"#c62828",fontSize:14}}>{fmt(s.pending)}</div>
                 </div>
               </div>
-              <div style={{fontSize:13,color:"#666",cursor:"pointer",textDecoration:"underline"}}
-                onClick={()=>setView(p)}>View Ledger ({s.trips} trips) →</div>
+              <div style={{fontSize:13,color:"#666",cursor:"pointer",textDecoration:"underline"}} onClick={()=>setView(p)}>View Ledger ({s.trips} trips) →</div>
             </Card>
           );
         })}
@@ -832,8 +984,7 @@ function PartiesPage({ data, update }) {
         <Textarea label="Address" value={f.address} onChange={e=>setF(p=>({...p,address:e.target.value}))} />
         <Textarea label="Notes" value={f.notes} onChange={e=>setF(p=>({...p,notes:e.target.value}))} />
         <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:8}}>
-          <Btn outline onClick={()=>setShowForm(false)}>Cancel</Btn>
-          <Btn onClick={save}>Save Party</Btn>
+          <Btn outline onClick={()=>setShowForm(false)}>Cancel</Btn><Btn onClick={save}>Save Party</Btn>
         </div>
       </Modal>
 
@@ -857,26 +1008,15 @@ function PartyLedger({ party, data }) {
       <div style={{fontWeight:700,marginBottom:10}}>All Trips</div>
       {trips.map(t=>(
         <div key={t.id} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid #f0f0f0"}}>
-          <div>
-            <div style={{fontWeight:500}}>{t.date} · {t.truckNumber}</div>
-            <div style={{fontSize:12,color:"#888"}}>{t.from}→{t.to} · {t.material}</div>
-          </div>
-          <div style={{textAlign:"right"}}>
-            <div style={{fontWeight:600}}>{fmt(t.freight)}</div>
-            <div style={{fontSize:12,color:Number(t.pending)>0?"#c62828":"#2e7d32"}}>
-              Pending: {fmt(t.pending)}
-            </div>
-          </div>
+          <div><div style={{fontWeight:500}}>{t.date} · {t.truckNumber}</div><div style={{fontSize:12,color:"#888"}}>{t.from}→{t.to} · {t.material}</div></div>
+          <div style={{textAlign:"right"}}><div>{fmt(t.freight)}</div><div style={{fontSize:12,color:Number(t.pending)>0?"#c62828":"#2e7d32"}}>Pending: {fmt(t.pending)}</div></div>
         </div>
       ))}
       {payments.length>0&&<>
         <div style={{fontWeight:700,margin:"16px 0 10px"}}>Payment History</div>
         {payments.map(p=>(
           <div key={p.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #f0f0f0"}}>
-            <div>
-              <div style={{fontWeight:500}}>{p.date} · {p.mode}</div>
-              {p.reference&&<div style={{fontSize:12,color:"#888"}}>Ref: {p.reference}</div>}
-            </div>
+            <div><div style={{fontWeight:500}}>{p.date} · {p.mode}</div>{p.reference&&<div style={{fontSize:12,color:"#888"}}>Ref: {p.reference}</div>}</div>
             <Badge color="green">{fmt(p.amount)}</Badge>
           </div>
         ))}
@@ -884,8 +1024,9 @@ function PartyLedger({ party, data }) {
     </div>
   );
 }
+
 // ============================================================
-// TRUCK DETAIL MODAL - Add this BEFORE TrucksPage
+// TRUCK DETAIL MODAL
 // ============================================================
 function TruckDetailModal({ truck, data, onClose }) {
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
@@ -897,26 +1038,19 @@ function TruckDetailModal({ truck, data, onClose }) {
   const filteredGeneralExpenses = allGeneralExpenses.filter(e => e.date?.slice(0,7) === selectedMonth);
   
   const truckDriver = data.drivers.find(d => d.truck === truck.number);
-  const driverSalaries = (data.staffSalaries || []).filter(s => 
-    s.staffName === truckDriver?.name && s.salaryMonth === selectedMonth
-  );
+  const driverSalaries = (data.staffSalaries || []).filter(s => s.staffName === truckDriver?.name && s.salaryMonth === selectedMonth);
   
   const tripIncome = filteredTrips.reduce((s, t) => s + (Number(t.freight) || 0), 0);
-  const tripExpensesTotal = filteredTrips.reduce((s, t) => s + 
-    (Number(t.diesel) || 0) + (Number(t.cng) || 0) + (Number(t.toll) || 0) + 
-    (Number(t.driverAdvance) || 0) + (Number(t.otherExpense) || 0), 0);
+  const tripExpensesTotal = filteredTrips.reduce((s, t) => s + (Number(t.diesel) || 0) + (Number(t.cng) || 0) + (Number(t.toll) || 0) + (Number(t.driverAdvance) || 0) + (Number(t.otherExpense) || 0), 0);
   
   const totalGeneralExpenses = filteredGeneralExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const totalDriverSalary = driverSalaries.reduce((s, sal) => s + (Number(sal.netAmount) || 0), 0);
-  
   const monthlyEmi = Number(truck.emiAmount) || 0;
   const totalExpenses = tripExpensesTotal + totalGeneralExpenses + totalDriverSalary + monthlyEmi;
   const netProfit = tripIncome - totalExpenses;
   
   const expensesByCategory = {};
-  filteredGeneralExpenses.forEach(e => {
-    expensesByCategory[e.category] = (expensesByCategory[e.category] || 0) + (Number(e.amount) || 0);
-  });
+  filteredGeneralExpenses.forEach(e => { expensesByCategory[e.category] = (expensesByCategory[e.category] || 0) + (Number(e.amount) || 0); });
 
   return (
     <div>
@@ -968,9 +1102,7 @@ function TruckDetailModal({ truck, data, onClose }) {
         
         <Card>
           <div style={{fontWeight:700, marginBottom:12}}>📋 Trip History</div>
-          {filteredTrips.length === 0 ? (
-            <EmptyState text="No trips for this period" />
-          ) : (
+          {filteredTrips.length === 0 ? <EmptyState text="No trips for this period" /> : (
             <div style={{maxHeight:300, overflowY:"auto"}}>
               {filteredTrips.map(trip => (
                 <div key={trip.id} style={{padding:"8px 0", borderBottom:"1px solid #f0f0f0"}}>
@@ -979,9 +1111,7 @@ function TruckDetailModal({ truck, data, onClose }) {
                     <span style={{color:"#2e7d32"}}>{fmt(trip.freight)}</span>
                   </div>
                   <div style={{fontSize:11, color:"#666"}}>{trip.from} → {trip.to} · {trip.partyName}</div>
-                  <div style={{fontSize:11, color: (trip.netProfit || 0) >= 0 ? "#2e7d32" : "#c62828"}}>
-                    Profit: {fmt(trip.netProfit)}
-                  </div>
+                  <div style={{fontSize:11, color: (trip.netProfit || 0) >= 0 ? "#2e7d32" : "#c62828"}}>Profit: {fmt(trip.netProfit)}</div>
                 </div>
               ))}
             </div>
@@ -989,23 +1119,25 @@ function TruckDetailModal({ truck, data, onClose }) {
         </Card>
       </div>
       
-      <div style={{display:"flex", justifyContent:"flex-end", marginTop:16}}>
-        <Btn onClick={onClose}>Close</Btn>
-      </div>
+      <div style={{display:"flex", justifyContent:"flex-end", marginTop:16}}><Btn onClick={onClose}>Close</Btn></div>
     </div>
   );
 }
+
+// ============================================================
+// TRUCKS PAGE
+// ============================================================
 function TrucksPage({ data, update }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [selectedTruck, setSelectedTruck] = useState(null);
-  const [truckMonths, setTruckMonths] = useState({}); // Store selected month per truck
+  const [truckMonths, setTruckMonths] = useState({});
   
   const blank = {
     number:"",ownership:"own",fuelType:"diesel",driver:"",helper:"",status:"available",
-    insuranceExpiry:"",fitnessExpiry:"",permitExpiry:"",pollutionExpiry:"",taxExpiry:"",
+    insuranceExpiry:"",fitnessExpiry:"",permitExpiry:"",nationalPermitExpiry:"",pollutionExpiry:"",taxExpiry:"",
     rcDetails:"",notes:"",emiAmount:0,emiStartDate:"",emiEndDate:"",loanAmount:0,
-    insuranceAmount:0,permitAmount:0,taxAmount:0,fitnessAmount:0
+    insuranceAmount:0,permitAmount:0,nationalPermitAmount:0,taxAmount:0,fitnessAmount:0
   };
   const [f, setF] = useState(blank);
 
@@ -1040,41 +1172,23 @@ function TrucksPage({ data, update }) {
 
   const statusColors = {available:"green",on_trip:"blue",repair:"orange",inactive:"gray"};
 
-  // Calculate complete truck P&L for a specific month
   const getTruckCompletePL = (truckNumber, targetMonth) => {
-    // Get trips for the selected month ONLY
     const allTrips = data.trips.filter(t => t.truckNumber === truckNumber);
     const filteredTrips = allTrips.filter(t => tripMonth(t) === targetMonth);
-    
     const tripIncome = filteredTrips.reduce((s, t) => s + (Number(t.freight) || 0), 0);
-    const tripExpenses = {
-      diesel: filteredTrips.reduce((s, t) => s + (Number(t.diesel) || 0), 0),
+    const tripExpenses = { diesel: filteredTrips.reduce((s, t) => s + (Number(t.diesel) || 0), 0),
       cng: filteredTrips.reduce((s, t) => s + (Number(t.cng) || 0), 0),
       toll: filteredTrips.reduce((s, t) => s + (Number(t.toll) || 0), 0),
       driverAdvance: filteredTrips.reduce((s, t) => s + (Number(t.driverAdvance) || 0), 0),
-      otherExpense: filteredTrips.reduce((s, t) => s + (Number(t.otherExpense) || 0), 0),
-    };
+      otherExpense: filteredTrips.reduce((s, t) => s + (Number(t.otherExpense) || 0), 0) };
     const totalTripExpenses = Object.values(tripExpenses).reduce((a, b) => a + b, 0);
-    
-    // General expenses for this specific truck for the selected month
-    const generalExpenses = (data.generalExpenses || []).filter(e => 
-      e.vehicleNumber === truckNumber && e.date?.slice(0,7) === targetMonth
-    );
+    const generalExpenses = (data.generalExpenses || []).filter(e => e.vehicleNumber === truckNumber && e.date?.slice(0,7) === targetMonth);
     const totalGeneralExpenses = generalExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-    
-    // Staff salary for driver for the selected month
     const truckDriver = data.drivers.find(d => d.truck === truckNumber);
-    const driverSalaries = (data.staffSalaries || []).filter(s => 
-      s.staffName === truckDriver?.name && s.salaryMonth === targetMonth
-    );
+    const driverSalaries = (data.staffSalaries || []).filter(s => s.staffName === truckDriver?.name && s.salaryMonth === targetMonth);
     const totalDriverSalary = driverSalaries.reduce((s, sal) => s + (Number(sal.netAmount) || 0), 0);
-    
     const truckData = data.trucks.find(t => t.number === truckNumber);
-    
-    // EMI - monthly
     const monthlyEmi = Number(truckData?.emiAmount) || 0;
-    
-    // Annual costs - divide by 12, but only if document is valid
     const getMonthlyCost = (expiryDate, annualAmount) => {
       if (!expiryDate || !annualAmount || annualAmount <= 0) return 0;
       const expiry = new Date(expiryDate);
@@ -1082,40 +1196,23 @@ function TrucksPage({ data, update }) {
       if (expiry < current) return 0;
       return Number(annualAmount) / 12;
     };
-    
     const monthlyInsurance = getMonthlyCost(truckData?.insuranceExpiry, truckData?.insuranceAmount);
     const monthlyPermit = getMonthlyCost(truckData?.permitExpiry, truckData?.permitAmount);
+    const monthlyNationalPermit = getMonthlyCost(truckData?.nationalPermitExpiry, truckData?.nationalPermitAmount);
     const monthlyTax = getMonthlyCost(truckData?.taxExpiry, truckData?.taxAmount);
     const monthlyFitness = getMonthlyCost(truckData?.fitnessExpiry, truckData?.fitnessAmount);
-    
-    const totalMonthlyFixedExpenses = monthlyEmi + monthlyInsurance + monthlyPermit + monthlyTax + monthlyFitness;
+    const totalMonthlyFixedExpenses = monthlyEmi + monthlyInsurance + monthlyPermit + monthlyNationalPermit + monthlyTax + monthlyFitness;
     const totalExpenses = totalTripExpenses + totalGeneralExpenses + totalDriverSalary + totalMonthlyFixedExpenses;
     const netProfit = tripIncome - totalExpenses;
-    
     return {
-      tripIncome,
-      tripExpenses: totalTripExpenses,
-      generalExpenses: totalGeneralExpenses,
-      driverSalary: totalDriverSalary,
-      fixedExpenses: totalMonthlyFixedExpenses,
-      totalExpenses,
-      netProfit,
-      trips: filteredTrips.length,
-      emiAmount: monthlyEmi,
-      breakdownDetails: {
-        diesel: tripExpenses.diesel,
-        cng: tripExpenses.cng,
-        toll: tripExpenses.toll,
-        other: tripExpenses.otherExpense
-      }
+      tripIncome, tripExpenses: totalTripExpenses, generalExpenses: totalGeneralExpenses, driverSalary: totalDriverSalary,
+      fixedExpenses: totalMonthlyFixedExpenses, totalExpenses, netProfit, trips: filteredTrips.length,
+      emiAmount: monthlyEmi
     };
   };
 
-  // Get or set truck month
   const getTruckMonth = (truckId) => truckMonths[truckId] || currentMonth;
-  const setTruckMonth = (truckId, month) => {
-    setTruckMonths(prev => ({ ...prev, [truckId]: month }));
-  };
+  const setTruckMonth = (truckId, month) => { setTruckMonths(prev => ({ ...prev, [truckId]: month })); };
 
   return (
     <div>
@@ -1128,17 +1225,11 @@ function TrucksPage({ data, update }) {
         {data.trucks.map(t => {
           const truckMonth = getTruckMonth(t.id);
           const pl = getTruckCompletePL(t.number, truckMonth);
-          
           return (
             <Card key={t.id}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
                 <div>
-                  <div 
-                    style={{fontWeight:700,fontSize:18,color:"#1a1a2e",cursor:"pointer",textDecoration:"underline"}} 
-                    onClick={() => setSelectedTruck(t)}
-                  >
-                    {t.number} 📋
-                  </div>
+                  <div style={{fontWeight:700,fontSize:18,color:"#1a1a2e",cursor:"pointer",textDecoration:"underline"}} onClick={() => setSelectedTruck(t)}>{t.number} 📋</div>
                   <div style={{color:"#888",fontSize:13}}>{t.ownership} · {t.fuelType}</div>
                   {t.driver && <div style={{fontSize:13}}>Driver: {t.driver}</div>}
                 </div>
@@ -1150,101 +1241,51 @@ function TrucksPage({ data, update }) {
                   </div>
                 </div>
               </div>
-              
-              {/* Month Selector and Performance */}
               <div style={{background:"#f5f5f5",borderRadius:8,padding:"10px",marginBottom:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                   <span style={{fontWeight:600,fontSize:12,color:"#555"}}>📊 Performance</span>
-                  <select 
-                    value={truckMonth} 
-                    onChange={(e) => setTruckMonth(t.id, e.target.value)}
-                    style={{...inp, width:120, padding:"4px 8px", fontSize:12}}
-                  >
+                  <select value={truckMonth} onChange={(e) => setTruckMonth(t.id, e.target.value)} style={{...inp, width:120, padding:"4px 8px", fontSize:12}}>
                     {monthOptions().slice(0,6).map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
                   </select>
                 </div>
-                
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                  <span style={{fontSize:12,color:"#666"}}>Trips this month</span>
-                  <span style={{fontWeight:600}}>{pl.trips}</span>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                  <span style={{fontSize:12,color:"#666"}}>Income (Freight)</span>
-                  <span style={{fontWeight:600,color:"#2e7d32"}}>{fmt(pl.tripIncome)}</span>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                  <span style={{fontSize:12,color:"#666"}}>Trip Expenses</span>
-                  <span style={{fontWeight:600,color:"#c62828"}}>{fmt(pl.tripExpenses)}</span>
-                </div>
-                {pl.generalExpenses > 0 && (
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                    <span style={{fontSize:12,color:"#666"}}>General Expenses</span>
-                    <span style={{fontWeight:600,color:"#c62828"}}>{fmt(pl.generalExpenses)}</span>
-                  </div>
-                )}
-                {pl.driverSalary > 0 && (
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                    <span style={{fontSize:12,color:"#666"}}>Driver Salary</span>
-                    <span style={{fontWeight:600,color:"#c62828"}}>{fmt(pl.driverSalary)}</span>
-                  </div>
-                )}
-                {pl.emiAmount > 0 && (
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                    <span style={{fontSize:12,color:"#666"}}>Monthly EMI</span>
-                    <span style={{fontWeight:600,color:"#c62828"}}>{fmt(pl.emiAmount)}</span>
-                  </div>
-                )}
-                {pl.fixedExpenses > 0 && pl.fixedExpenses !== pl.emiAmount && (
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                    <span style={{fontSize:12,color:"#666"}}>Other Fixed Costs</span>
-                    <span style={{fontWeight:600,color:"#c62828"}}>{fmt(pl.fixedExpenses - pl.emiAmount)}</span>
-                  </div>
-                )}
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span>Trips this month</span><span>{pl.trips}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span>Income (Freight)</span><span style={{color:"#2e7d32"}}>{fmt(pl.tripIncome)}</span></div>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span>Trip Expenses</span><span style={{color:"#c62828"}}>{fmt(pl.tripExpenses)}</span></div>
+                {pl.generalExpenses > 0 && <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span>General Expenses</span><span>{fmt(pl.generalExpenses)}</span></div>}
+                {pl.driverSalary > 0 && <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span>Driver Salary</span><span>{fmt(pl.driverSalary)}</span></div>}
+                {pl.emiAmount > 0 && <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span>Monthly EMI</span><span>{fmt(pl.emiAmount)}</span></div>}
+                {pl.fixedExpenses > pl.emiAmount && <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span>Other Fixed Costs</span><span>{fmt(pl.fixedExpenses - pl.emiAmount)}</span></div>}
                 <div style={{display:"flex",justifyContent:"space-between",marginTop:8,paddingTop:8,borderTop:"2px solid #ddd"}}>
-                  <span style={{fontSize:13,fontWeight:700}}>Net Profit/Loss</span>
-                  <span style={{fontWeight:700,fontSize:14,color:pl.netProfit>=0?"#2e7d32":"#c62828"}}>{fmt(pl.netProfit)}</span>
+                  <span style={{fontWeight:700}}>Net Profit/Loss</span>
+                  <span style={{fontWeight:700,color:pl.netProfit>=0?"#2e7d32":"#c62828"}}>{fmt(pl.netProfit)}</span>
                 </div>
               </div>
-              
-              {/* Document expiry display */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:12}}>
                 {[
                   ["Insurance",t.insuranceExpiry, t.insuranceAmount],
                   ["Fitness",t.fitnessExpiry, t.fitnessAmount],
                   ["Permit",t.permitExpiry, t.permitAmount],
+                  ["National Permit",t.nationalPermitExpiry, t.nationalPermitAmount],
                   ["Pollution",t.pollutionExpiry],
                   ["Tax",t.taxExpiry, t.taxAmount]
                 ].map(([l,d,amt]) => d && (
-                  <div key={l} style={{
-                    display:"flex",justifyContent:"space-between",padding:"4px 8px",borderRadius:6,
-                    background:docStatus(d)==="red"?"#ffebee":docStatus(d)==="yellow"?"#fffde7":"#e8f5e9"
-                  }}>
-                    <span style={{color:"#555"}}>{l}</span>
-                    <span style={{
-                      fontWeight:600,
-                      color:docStatus(d)==="red"?"#c62828":docStatus(d)==="yellow"?"#f57f17":"#2e7d32"
-                    }}>
-                      {d}
-                    </span>
+                  <div key={l} style={{ display:"flex",justifyContent:"space-between",padding:"4px 8px",borderRadius:6,
+                    background:docStatus(d)==="red"?"#ffebee":docStatus(d)==="yellow"?"#fffde7":"#e8f5e9" }}>
+                    <span>{l}</span>
+                    <span style={{ fontWeight:600, color:docStatus(d)==="red"?"#c62828":docStatus(d)==="yellow"?"#f57f17":"#2e7d32" }}>{d}</span>
                   </div>
                 ))}
               </div>
-              {t.emiAmount > 0 && (
-                <div style={{marginTop:8,fontSize:11,color:"#888"}}>
-                  💰 EMI: {fmt(t.emiAmount)}/month
-                </div>
-              )}
+              {t.emiAmount > 0 && <div style={{marginTop:8,fontSize:11,color:"#888"}}>💰 EMI: {fmt(t.emiAmount)}/month</div>}
             </Card>
           );
         })}
       </div>
 
-      {/* Truck Detail Modal */}
       <Modal open={!!selectedTruck} onClose={()=>setSelectedTruck(null)} title={`Truck Details: ${selectedTruck?.number}`} wide>
         {selectedTruck && <TruckDetailModal truck={selectedTruck} data={data} onClose={()=>setSelectedTruck(null)} />}
       </Modal>
 
-      {/* Add/Edit Truck Modal */}
       <Modal open={showForm} onClose={()=>{setShowForm(false);setEditing(null)}} title={editing?"Edit Truck":"New Truck"} wide>
         <div style={{display:"flex",flexWrap:"wrap",gap:0}}>
           <Input label="Truck Number" value={f.number} onChange={e=>setF(p=>({...p,number:e.target.value}))} half />
@@ -1255,22 +1296,19 @@ function TrucksPage({ data, update }) {
             <option value="diesel">Diesel</option><option value="cng">CNG</option>
           </Select>
           <Select label="Status" value={f.status} onChange={e=>setF(p=>({...p,status:e.target.value}))} half>
-            <option value="available">Available</option><option value="on_trip">On Trip</option>
-            <option value="repair">Repair</option><option value="inactive">Inactive</option>
+            <option value="available">Available</option><option value="on_trip">On Trip</option><option value="repair">Repair</option><option value="inactive">Inactive</option>
           </Select>
           <Input label="Driver Assigned" value={f.driver} onChange={e=>setF(p=>({...p,driver:e.target.value}))} half />
           <Input label="Helper" value={f.helper} onChange={e=>setF(p=>({...p,helper:e.target.value}))} half />
         </div>
-        
-        <div style={{fontWeight:600,fontSize:13,color:"#666",margin:"12px 0 8px",textTransform:"uppercase"}}>Loan / EMI Details</div>
+        <div style={{fontWeight:600,fontSize:13,color:"#666",margin:"12px 0 8px"}}>Loan / EMI Details</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:0}}>
           <Input label="Monthly EMI (₹)" type="number" value={f.emiAmount} onChange={e=>setF(p=>({...p,emiAmount:e.target.value}))} half />
           <Input label="Loan Amount (₹)" type="number" value={f.loanAmount} onChange={e=>setF(p=>({...p,loanAmount:e.target.value}))} half />
           <Input label="EMI Start Date" type="date" value={f.emiStartDate} onChange={e=>setF(p=>({...p,emiStartDate:e.target.value}))} half />
           <Input label="EMI End Date" type="date" value={f.emiEndDate} onChange={e=>setF(p=>({...p,emiEndDate:e.target.value}))} half />
         </div>
-        
-        <div style={{fontWeight:600,fontSize:13,color:"#666",margin:"12px 0 8px",textTransform:"uppercase"}}>Document Expiry Dates & Annual Amounts</div>
+        <div style={{fontWeight:600,fontSize:13,color:"#666",margin:"12px 0 8px"}}>Document Expiry Dates & Annual Amounts</div>
         <div style={{display:"flex",flexWrap:"wrap",gap:0}}>
           <Input label="Insurance Expiry" type="date" value={f.insuranceExpiry} onChange={e=>setF(p=>({...p,insuranceExpiry:e.target.value}))} half />
           <Input label="Insurance Amount (₹/year)" type="number" value={f.insuranceAmount} onChange={e=>setF(p=>({...p,insuranceAmount:e.target.value}))} half />
@@ -1278,6 +1316,8 @@ function TrucksPage({ data, update }) {
           <Input label="Fitness Amount (₹/year)" type="number" value={f.fitnessAmount} onChange={e=>setF(p=>({...p,fitnessAmount:e.target.value}))} half />
           <Input label="Permit Expiry" type="date" value={f.permitExpiry} onChange={e=>setF(p=>({...p,permitExpiry:e.target.value}))} half />
           <Input label="Permit Amount (₹/year)" type="number" value={f.permitAmount} onChange={e=>setF(p=>({...p,permitAmount:e.target.value}))} half />
+          <Input label="National Permit Expiry" type="date" value={f.nationalPermitExpiry} onChange={e=>setF(p=>({...p,nationalPermitExpiry:e.target.value}))} half />
+          <Input label="National Permit Amount (₹/year)" type="number" value={f.nationalPermitAmount} onChange={e=>setF(p=>({...p,nationalPermitAmount:e.target.value}))} half />
           <Input label="Tax Expiry" type="date" value={f.taxExpiry} onChange={e=>setF(p=>({...p,taxExpiry:e.target.value}))} half />
           <Input label="Tax Amount (₹/year)" type="number" value={f.taxAmount} onChange={e=>setF(p=>({...p,taxAmount:e.target.value}))} half />
           <Input label="Pollution Expiry" type="date" value={f.pollutionExpiry} onChange={e=>setF(p=>({...p,pollutionExpiry:e.target.value}))} half />
@@ -1285,21 +1325,25 @@ function TrucksPage({ data, update }) {
         </div>
         <Textarea label="Notes" value={f.notes} onChange={e=>setF(p=>({...p,notes:e.target.value}))} />
         <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:8}}>
-          <Btn outline onClick={()=>setShowForm(false)}>Cancel</Btn>
-          <Btn onClick={save}>Save Truck</Btn>
+          <Btn outline onClick={()=>setShowForm(false)}>Cancel</Btn><Btn onClick={save}>Save Truck</Btn>
         </div>
       </Modal>
     </div>
   );
 }
+
+// Due to character limit, I'll continue in the next message with the remaining components:
+// DriverLedger, DriversPage, CashbookPage, PaymentsPage, PendingPage, InvoicePage, InvoicePreview, ReportsPage, ProfitLossReport, SettingsPage, TransportersPage, GeneralExpensesPage, StaffSalariesPage, OwnerDrawingsPage, and the main App component.
+// ============================================================
+// DRIVER LEDGER
+// ============================================================
 function DriverLedger({ driver, data, update, onClose }) {
   const [tab, setTab] = useState("attendance");
   const [attMonth, setAttMonth] = useState(currentMonth);
-  const [advMonth, setAdvMonth] = useState(currentMonth); // New: month filter for advances
+  const [advMonth, setAdvMonth] = useState(currentMonth);
   const [advForm, setAdvForm] = useState(false);
   const [advF, setAdvF] = useState({ date: new Date().toISOString().slice(0,10), amount:0, note:"", type:"advance" });
 
-  // Attendance helpers
   const attKey = (driverId, month) => `att_${driverId}_${month}`;
   const getAtt = () => {
     try { return JSON.parse(localStorage.getItem(attKey(driver.id, attMonth))||"{}"); } catch { return {}; }
@@ -1315,7 +1359,6 @@ function DriverLedger({ driver, data, update, onClose }) {
     saveAtt(newAtt);
   };
 
-  // Days in selected month
   const [yr, mo] = attMonth.split("-").map(Number);
   const daysInMonth = new Date(yr, mo, 0).getDate();
   const days = Array.from({length: daysInMonth}, (_, i) => String(i+1).padStart(2,"0"));
@@ -1328,8 +1371,6 @@ function DriverLedger({ driver, data, update, onClose }) {
   const half = days.filter(d=>att[d]==="H").length;
   const leave = days.filter(d=>att[d]==="L").length;
   const effectiveDays = present + (half*0.5);
-
-  // Salary calc
   const totalDays = daysInMonth;
   const salaryEarned = driver.salaryType==="monthly"
     ? Math.round((Number(driver.salary)||0) * effectiveDays / totalDays)
@@ -1337,23 +1378,14 @@ function DriverLedger({ driver, data, update, onClose }) {
     ? Math.round((Number(driver.salary)||0) * effectiveDays)
     : Number(driver.salary)||0;
 
-  // Advances with month filter
   const allAdvances = (data.driverAdvances||[]).filter(a=>a.driverId===driver.id);
-  const advances = allAdvances.filter(a => a.date?.slice(0,7) === advMonth)
-    .sort((a,b)=>b.date?.localeCompare(a.date));
-  
+  const advances = allAdvances.filter(a => a.date?.slice(0,7) === advMonth).sort((a,b)=>b.date?.localeCompare(a.date));
   const tripAdvancesAll = data.trips.filter(t=>t.driverName===driver.name&&(Number(t.driverAdvance)||0)>0);
   const tripAdvances = tripAdvancesAll.filter(t => t.date?.slice(0,7) === advMonth);
-  
-  // Totals for selected month
-  const totalAdvGiven = advances.filter(a=>a.type==="advance").reduce((s,a)=>s+(Number(a.amount)||0),0)
-    + tripAdvances.reduce((s,t)=>s+(Number(t.driverAdvance)||0),0);
+  const totalAdvGiven = advances.filter(a=>a.type==="advance").reduce((s,a)=>s+(Number(a.amount)||0),0) + tripAdvances.reduce((s,t)=>s+(Number(t.driverAdvance)||0),0);
   const totalSalaryPaid = advances.filter(a=>a.type==="salary").reduce((s,a)=>s+(Number(a.amount)||0),0);
   const advanceOutstanding = Math.max(0, totalAdvGiven - totalSalaryPaid);
-
-  // Cumulative totals (all time)
-  const allTimeAdvGiven = allAdvances.filter(a=>a.type==="advance").reduce((s,a)=>s+(Number(a.amount)||0),0)
-    + tripAdvancesAll.reduce((s,t)=>s+(Number(t.driverAdvance)||0),0);
+  const allTimeAdvGiven = allAdvances.filter(a=>a.type==="advance").reduce((s,a)=>s+(Number(a.amount)||0),0) + tripAdvancesAll.reduce((s,t)=>s+(Number(t.driverAdvance)||0),0);
   const allTimeSalaryPaid = allAdvances.filter(a=>a.type==="salary").reduce((s,a)=>s+(Number(a.amount)||0),0);
   const cumulativeOutstanding = Math.max(0, allTimeAdvGiven - allTimeSalaryPaid);
 
@@ -1378,32 +1410,22 @@ function DriverLedger({ driver, data, update, onClose }) {
 
   return (
     <div>
-      {/* Driver summary */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
         <StatCard label="Salary/Month" value={fmt(driver.salary)} color="blue" />
         <StatCard label="Total Advance (This Month)" value={fmt(totalAdvGiven)} color="orange" />
         <StatCard label="Salary Paid (This Month)" value={fmt(totalSalaryPaid)} color="green" />
         <StatCard label={advanceOutstanding>0?"Advance to Recover":"Account Settled"} value={advanceOutstanding>0?fmt(advanceOutstanding):"✓ Clear"} color={advanceOutstanding>0?"orange":"green"} />
       </div>
-      
-      {/* Cumulative Info */}
       <div style={{background:"#f0f4ff",borderRadius:8,padding:"8px 12px",marginBottom:16,fontSize:12}}>
         <span style={{color:"#666"}}>📊 Cumulative Outstanding: </span>
-        <span style={{fontWeight:700,color:cumulativeOutstanding>0?"#e65100":"#2e7d32"}}>
-          {cumulativeOutstanding>0?fmt(cumulativeOutstanding):"Settled"}
-        </span>
+        <span style={{fontWeight:700,color:cumulativeOutstanding>0?"#e65100":"#2e7d32"}}>{cumulativeOutstanding>0?fmt(cumulativeOutstanding):"Settled"}</span>
       </div>
-
-      {/* Tabs */}
       <div style={{display:"flex",borderBottom:"1px solid #eee",marginBottom:20}}>
         <button style={tabStyle("attendance")} onClick={()=>setTab("attendance")}>📅 Attendance</button>
         <button style={tabStyle("advances")} onClick={()=>setTab("advances")}>💰 Advances & Salary</button>
       </div>
-
-      {/* ATTENDANCE TAB - same as before */}
       {tab==="attendance" && (
         <div>
-          {/* ... keep existing attendance code ... */}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16,flexWrap:"wrap",gap:10}}>
             <select value={attMonth} onChange={e=>setAttMonth(e.target.value)} style={{...inp,width:160}}>
               {monthOptions().map(o=><option key={o.val} value={o.val}>{o.label}</option>)}
@@ -1419,17 +1441,14 @@ function DriverLedger({ driver, data, update, onClose }) {
               ))}
             </div>
           </div>
-
           <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10,marginBottom:16}}>
-            {[["Present",present,"green"],["Absent",absent,"red"],["Half Day",half,"orange"],
-              ["Leave",leave,"blue"],["Earned Days",effectiveDays,"purple"]
-            ].map(([l,v,c])=>(
-              <StatCard key={l} label={l} value={v} color={c} />
-            ))}
+            <StatCard label="Present" value={present} color="green" />
+            <StatCard label="Absent" value={absent} color="red" />
+            <StatCard label="Half Day" value={half} color="orange" />
+            <StatCard label="Leave" value={leave} color="blue" />
+            <StatCard label="Earned Days" value={effectiveDays} color="purple" />
           </div>
-
-          <div style={{background:"#e8f5e9",borderRadius:8,padding:"12px 16px",marginBottom:16,
-            display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{background:"#e8f5e9",borderRadius:8,padding:"12px 16px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <div>
               <div style={{fontSize:12,color:"#2e7d32",fontWeight:600}}>ESTIMATED SALARY FOR {getMonthLabel(attMonth)}</div>
               <div style={{fontSize:11,color:"#555",marginTop:2}}>
@@ -1440,7 +1459,6 @@ function DriverLedger({ driver, data, update, onClose }) {
             </div>
             <div style={{fontSize:22,fontWeight:700,color:"#2e7d32"}}>{fmt(salaryEarned)}</div>
           </div>
-
           <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:6}}>
             {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>(
               <div key={d} style={{textAlign:"center",fontSize:11,fontWeight:700,color:"#888",padding:"4px 0"}}>{d}</div>
@@ -1472,8 +1490,6 @@ function DriverLedger({ driver, data, update, onClose }) {
           </div>
         </div>
       )}
-
-      {/* ADVANCES TAB - with month filter */}
       {tab==="advances" && (
         <div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
@@ -1485,8 +1501,6 @@ function DriverLedger({ driver, data, update, onClose }) {
             </div>
             <Btn onClick={()=>setAdvForm(true)}>+ Add Entry</Btn>
           </div>
-
-          {/* Trip advances for selected month */}
           {tripAdvances.length>0 && (
             <div style={{marginBottom:16}}>
               <div style={{fontSize:12,fontWeight:700,color:"#888",textTransform:"uppercase",marginBottom:8}}>
@@ -1504,8 +1518,6 @@ function DriverLedger({ driver, data, update, onClose }) {
               ))}
             </div>
           )}
-
-          {/* Manual entries for selected month */}
           <div style={{fontSize:12,fontWeight:700,color:"#888",textTransform:"uppercase",marginBottom:8}}>
             Manual Entries ({getMonthLabel(advMonth)})
           </div>
@@ -1527,13 +1539,11 @@ function DriverLedger({ driver, data, update, onClose }) {
               </div>
             </div>
           ))}
-
           <div style={{marginTop:16,padding:"12px 16px",borderRadius:8,
             background:advanceOutstanding>0?"#fff3e0":"#e8f5e9",display:"flex",justifyContent:"space-between"}}>
             <span style={{fontWeight:700}}>{advanceOutstanding>0?"Advance Outstanding for this month":"✓ Account Settled for this month"}</span>
             <span style={{fontWeight:700,fontSize:16,color:advanceOutstanding>0?"#e65100":"#2e7d32"}}>{fmt(advanceOutstanding)}</span>
           </div>
-
           <Modal open={advForm} onClose={()=>setAdvForm(false)} title="Add Advance / Salary Entry">
             <Input label="Date" type="date" value={advF.date} onChange={e=>setAdvF(p=>({...p,date:e.target.value}))} half />
             <Select label="Type" value={advF.type} onChange={e=>setAdvF(p=>({...p,type:e.target.value}))} half>
@@ -1553,6 +1563,9 @@ function DriverLedger({ driver, data, update, onClose }) {
   );
 }
 
+// ============================================================
+// DRIVERS PAGE
+// ============================================================
 function DriversPage({ data, update }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -1598,7 +1611,6 @@ function DriversPage({ data, update }) {
           const totalAdv = tripAdvances + manualAdvances.filter(a=>a.type==="advance").reduce((s,a)=>s+(Number(a.amount)||0),0);
           const salaryPaid = manualAdvances.filter(a=>a.type==="salary").reduce((s,a)=>s+(Number(a.amount)||0),0);
           const advOutstanding = Math.max(0, totalAdv - salaryPaid);
-          const isSettled = advOutstanding === 0;
           return (
             <Card key={d.id}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
@@ -1635,7 +1647,6 @@ function DriversPage({ data, update }) {
         })}
       </div>
 
-      {/* Add/Edit Driver Modal */}
       <Modal open={showForm} onClose={()=>{setShowForm(false);setEditing(null)}} title={editing?"Edit Driver":"New Driver"}>
         <Input label="Driver Name" value={f.name} onChange={e=>setF(p=>({...p,name:e.target.value}))} />
         <Input label="Mobile" value={f.mobile} onChange={e=>setF(p=>({...p,mobile:e.target.value}))} half />
@@ -1658,7 +1669,6 @@ function DriversPage({ data, update }) {
         </div>
       </Modal>
 
-      {/* Driver Ledger Modal */}
       <Modal open={!!viewDriver} onClose={()=>setViewDriver(null)}
         title={viewDriver?`${viewDriver.name} — Attendance & Ledger`:""} wide>
         {viewDriver&&<DriverLedger driver={viewDriver} data={data} update={update} onClose={()=>setViewDriver(null)} />}
@@ -1667,6 +1677,9 @@ function DriversPage({ data, update }) {
   );
 }
 
+// ============================================================
+// CASHBOOK PAGE
+// ============================================================
 function CashbookPage({ data, update, openAdd }) {
   const [month, setMonth] = useState(currentMonth);
   const [showForm, setShowForm] = useState(openAdd||false);
@@ -1678,9 +1691,7 @@ function CashbookPage({ data, update, openAdd }) {
   const [f, setF] = useState(blank);
   useEffect(()=>{if(openAdd)setShowForm(true);},[openAdd]);
 
-  const entries = data.cashbook.filter(c=>c.date?.slice(0,7)===month)
-    .sort((a,b)=>a.date?.localeCompare(b.date));
-
+  const entries = data.cashbook.filter(c=>c.date?.slice(0,7)===month).sort((a,b)=>a.date?.localeCompare(b.date));
   const cashIn = entries.filter(e=>e.type==="in").reduce((s,e)=>s+(Number(e.amount)||0),0);
   const cashOut = entries.filter(e=>e.type==="out").reduce((s,e)=>s+(Number(e.amount)||0),0);
 
@@ -1782,10 +1793,13 @@ function CashbookPage({ data, update, openAdd }) {
   );
 }
 
+// ============================================================
+// PAYMENTS PAGE
+// ============================================================
 function PaymentsPage({ data, update }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [monthFilter, setMonthFilter] = useState(currentMonth); // New month filter
+  const [monthFilter, setMonthFilter] = useState(currentMonth);
   const blank = {
     date: new Date().toISOString().slice(0,10),
     partyName:"",amount:0,mode:"cash",reference:"",tripId:"",receivedBy:"",remarks:""
@@ -1801,7 +1815,6 @@ function PaymentsPage({ data, update }) {
       list[idx] = { ...editing, ...f };
     } else {
       list.push({ ...f, id: genId() });
-      // Reduce pending on oldest unpaid trip
       const partyTrips = trips.filter(t=>t.partyName===f.partyName&&(Number(t.pending)||0)>0)
         .sort((a,b)=>a.date?.localeCompare(b.date));
       let remaining = Number(f.amount)||0;
@@ -1830,12 +1843,9 @@ function PaymentsPage({ data, update }) {
     update("payments", data.payments.filter(p=>p.id!==id));
   };
 
-  // Apply month filter
   const filteredPayments = data.payments.filter(p => p.date?.slice(0,7) === monthFilter);
   const sorted = [...filteredPayments].sort((a,b)=>b.date?.localeCompare(a.date));
-  
   const parties = [...new Set(data.trips.map(t=>t.partyName).filter(Boolean))];
-  
   const totalReceived = sorted.reduce((s,p)=>s+(Number(p.amount)||0),0);
 
   return (
@@ -1849,20 +1859,17 @@ function PaymentsPage({ data, update }) {
           <Btn onClick={()=>{setF(blank);setEditing(null);setShowForm(true)}}>+ Add Payment</Btn>
         </div>
       </div>
-      
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
         <StatCard label={`Total Received (${getMonthLabel(monthFilter)})`} value={fmt(totalReceived)} color="green" />
         <StatCard label="All Time Total" value={fmt(data.payments.reduce((s,p)=>s+(Number(p.amount)||0),0))} color="blue" />
         <StatCard label="Entries" value={sorted.length} color="purple" />
       </div>
-      
       <Card style={{overflowX:"auto"}}>
         {sorted.length===0 ? <EmptyState text={`No payments recorded for ${getMonthLabel(monthFilter)}`} /> : (
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
             <thead><tr style={{background:"#f8f8f8",borderBottom:"2px solid #eee"}}>
               {["Date","Party","Amount","Mode","Reference","Received By",""].map(h=>(
-                <th key={h} style={{textAlign:h==="Amount"?"right":"left",
-                  padding:"10px 12px",color:"#666",fontWeight:700,fontSize:12,textTransform:"uppercase"}}>{h}</th>
+                <th key={h} style={{textAlign:h==="Amount"?"right":"left",padding:"10px 12px",color:"#666",fontWeight:700,fontSize:12,textTransform:"uppercase"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>{sorted.map(p=>(
@@ -1873,15 +1880,12 @@ function PaymentsPage({ data, update }) {
                 <td style={{padding:"10px 12px"}}>{p.mode}</td>
                 <td style={{padding:"10px 12px",color:"#888"}}>{p.reference||"-"}</td>
                 <td style={{padding:"10px 12px"}}>{p.receivedBy||"-"}</td>
-                <td style={{padding:"10px 12px"}}>
-                  <Btn small danger onClick={()=>del(p.id)}>Del</Btn>
-                </td>
+                <td style={{padding:"10px 12px"}}><Btn small danger onClick={()=>del(p.id)}>Del</Btn></td>
               </tr>
             ))}</tbody>
           </table>
         )}
       </Card>
-      
       <Modal open={showForm} onClose={()=>{setShowForm(false);setEditing(null)}} title="New Payment">
         <Input label="Date" type="date" value={f.date} onChange={e=>setF(p=>({...p,date:e.target.value}))} half />
         <Select label="Party Name" value={f.partyName} onChange={e=>setF(p=>({...p,partyName:e.target.value}))} half>
@@ -1890,17 +1894,12 @@ function PaymentsPage({ data, update }) {
         </Select>
         <Input label="Amount Received (₹)" type="number" value={f.amount} onChange={e=>setF(p=>({...p,amount:e.target.value}))} half />
         <Select label="Payment Mode" value={f.mode} onChange={e=>setF(p=>({...p,mode:e.target.value}))} half>
-          <option value="cash">Cash</option>
-          <option value="bank">Bank Transfer</option>
-          <option value="cheque">Cheque</option>
-          <option value="upi">UPI</option>
+          <option value="cash">Cash</option><option value="bank">Bank Transfer</option><option value="cheque">Cheque</option><option value="upi">UPI</option>
         </Select>
         <Input label="Reference Number" value={f.reference} onChange={e=>setF(p=>({...p,reference:e.target.value}))} half />
         <Input label="Received By" value={f.receivedBy} onChange={e=>setF(p=>({...p,receivedBy:e.target.value}))} half />
         <Textarea label="Remarks" value={f.remarks} onChange={e=>setF(p=>({...p,remarks:e.target.value}))} />
-        <div style={{padding:"10px 14px",background:"#fff3e0",borderRadius:8,marginBottom:12,fontSize:13}}>
-          ⚡ Payment will automatically reduce pending amount for this party's oldest unpaid trips.
-        </div>
+        <div style={{padding:"10px 14px",background:"#fff3e0",borderRadius:8,marginBottom:12,fontSize:13}}>⚡ Payment will automatically reduce pending amount for this party's oldest unpaid trips.</div>
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <Btn outline onClick={()=>setShowForm(false)}>Cancel</Btn>
           <Btn onClick={save}>Save Payment</Btn>
@@ -1909,212 +1908,170 @@ function PaymentsPage({ data, update }) {
     </div>
   );
 }
-
+// ============================================================
+// PENDING PAGE (with Opening Pending)
+// ============================================================
 function PendingPage({ data, update }) {
   const [month, setMonth] = useState("");
   const [partyF, setPartyF] = useState("");
   const [daysF, setDaysF] = useState("");
   const [showOpeningForm, setShowOpeningForm] = useState(false);
-const [openingForm, setOpeningForm] = useState({
-  partyName: "",
-  amount: 0,
-  remarks: "Before May 2026"
-});
-  const today = new Date().toISOString().slice(0,10);
-  const daysDiff = (date) => {
-    if (!date) return 0;
-    return Math.floor((Date.now()-new Date(date).getTime())/864e5);
-  };
-
-  let pending = data.trips.filter(t=>(Number(t.pending)||0)>0);
-  if (month) pending = pending.filter(t=>tripMonth(t)===month);
-  if (partyF) pending = pending.filter(t=>t.partyName===partyF);
-  if (daysF==="15") pending = pending.filter(t=>daysDiff(t.date)>15);
-  if (daysF==="30") pending = pending.filter(t=>daysDiff(t.date)>30);
-  pending = pending.sort((a,b)=>(Number(b.pending)||0)-(Number(a.pending)||0));
-
-  const parties = [...new Set(data.trips.filter(t=>(Number(t.pending)||0)>0).map(t=>t.partyName).filter(Boolean))];
-  const total = pending.reduce((s,t)=>s+(Number(t.pending)||0),0);
-
-  const openingTotal = (data.openingPending || []).reduce(
-  (s, x) => s + (Number(x.amount) || 0),
-  0
-);
-
-const grandTotal = total + openingTotal;
-  const saveOpeningPending = () => {
-  if (!openingForm.partyName || !openingForm.amount) {
-    return alert("Party and amount required");
-  }
-
-  const list = [
-    ...(data.openingPending || []),
-    {
-      ...openingForm,
-      id: genId(),
-      amount: Number(openingForm.amount),
-      createdAt: new Date().toISOString()
-    }
-  ];
-
-  update("openingPending", list);
-
-  setOpeningForm({
+  const [openingForm, setOpeningForm] = useState({
     partyName: "",
     amount: 0,
     remarks: "Before May 2026"
   });
 
-  setShowOpeningForm(false);
-};
+  const daysDiff = (date) => {
+    if (!date) return 0;
+    return Math.floor((Date.now() - new Date(date).getTime()) / 864e5);
+  };
 
-const deleteOpeningPending = (id) => {
-  if (!confirm("Delete opening pending?")) return;
-  update(
-    "openingPending",
-    (data.openingPending || []).filter(x => x.id !== id)
-  );
-};
+  let pending = data.trips.filter(t => (Number(t.pending) || 0) > 0);
+  if (month) pending = pending.filter(t => tripMonth(t) === month);
+  if (partyF) pending = pending.filter(t => t.partyName === partyF);
+  if (daysF === "15") pending = pending.filter(t => daysDiff(t.date) > 15);
+  if (daysF === "30") pending = pending.filter(t => daysDiff(t.date) > 30);
+  pending = pending.sort((a, b) => (Number(b.pending) || 0) - (Number(a.pending) || 0));
+
+  const parties = [...new Set(data.trips.filter(t => (Number(t.pending) || 0) > 0).map(t => t.partyName).filter(Boolean))];
+  const total = pending.reduce((s, t) => s + (Number(t.pending) || 0), 0);
+  const openingTotal = (data.openingPending || []).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+  const grandTotal = total + openingTotal;
+
+  const saveOpeningPending = () => {
+    if (!openingForm.partyName || !openingForm.amount) {
+      return alert("Party and amount required");
+    }
+    const list = [
+      ...(data.openingPending || []),
+      {
+        ...openingForm,
+        id: genId(),
+        amount: Number(openingForm.amount),
+        createdAt: new Date().toISOString()
+      }
+    ];
+    update("openingPending", list);
+    setOpeningForm({ partyName: "", amount: 0, remarks: "Before May 2026" });
+    setShowOpeningForm(false);
+  };
+
+  const deleteOpeningPending = (id) => {
+    if (!confirm("Delete opening pending?")) return;
+    update("openingPending", (data.openingPending || []).filter(x => x.id !== id));
+  };
 
   return (
     <div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
-        <h2 style={{margin:0,fontSize:22,fontWeight:700,color:"#1a1a2e"}}>Pending Payments</h2>
-        <div style={{display:"flex",gap:10,alignItems:"center"}}>
-  <Badge color="orange">Opening Pending: {fmt(openingTotal)}</Badge>
-  <Badge color="red">Current Pending: {fmt(total)}</Badge>
-  <Badge color="blue">Total Receivable: {fmt(grandTotal)}</Badge>
-</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1a1a2e" }}>Pending Payments</h2>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Badge color="orange">Opening Pending: {fmt(openingTotal)}</Badge>
+          <Badge color="red">Current Pending: {fmt(total)}</Badge>
+          <Badge color="blue">Total Receivable: {fmt(grandTotal)}</Badge>
+        </div>
       </div>
 
-      <Card style={{marginBottom:16}}>
-  <div style={{fontWeight:700,fontSize:15,marginBottom:14}}>
-    Opening Pending / Previous Outstanding
-  </div>
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Opening Pending / Previous Outstanding</div>
+        {(data.openingPending || []).length === 0 ? (
+          <EmptyState text="No opening pending added" />
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f8f8f8", borderBottom: "2px solid #eee" }}>
+                <th style={{ padding: "10px 12px", textAlign: "left" }}>Party</th>
+                <th style={{ padding: "10px 12px", textAlign: "right" }}>Amount</th>
+                <th style={{ padding: "10px 12px", textAlign: "left" }}>Remarks</th>
+                <th style={{ padding: "10px 12px" }}></th>
+               </tr>
+            </thead>
+            <tbody>
+              {(data.openingPending || []).map(x => (
+                <tr key={x.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                  <td style={{ padding: "10px 12px", fontWeight: 600 }}>{x.partyName}</td>
+                  <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: "#c62828" }}>{fmt(x.amount)}</td>
+                  <td style={{ padding: "10px 12px", color: "#666" }}>{x.remarks}</td>
+                  <td style={{ padding: "10px 12px", textAlign: "right" }}>
+                    <Btn small danger onClick={() => deleteOpeningPending(x.id)}>Del</Btn>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
 
-  {(data.openingPending || []).length === 0 ? (
-    <EmptyState text="No opening pending added" />
-  ) : (
-    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-      <thead>
-        <tr style={{background:"#f8f8f8",borderBottom:"2px solid #eee"}}>
-          <th style={{padding:"10px 12px",textAlign:"left"}}>Party</th>
-          <th style={{padding:"10px 12px",textAlign:"right"}}>Amount</th>
-          <th style={{padding:"10px 12px",textAlign:"left"}}>Remarks</th>
-          <th style={{padding:"10px 12px"}}></th>
-        </tr>
-      </thead>
-      <tbody>
-        {(data.openingPending || []).map(x => (
-          <tr key={x.id} style={{borderBottom:"1px solid #f0f0f0"}}>
-            <td style={{padding:"10px 12px",fontWeight:600}}>{x.partyName}</td>
-            <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:"#c62828"}}>
-              {fmt(x.amount)}
-            </td>
-            <td style={{padding:"10px 12px",color:"#666"}}>{x.remarks}</td>
-            <td style={{padding:"10px 12px",textAlign:"right"}}>
-              <Btn small danger onClick={() => deleteOpeningPending(x.id)}>Del</Btn>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )}
-</Card>
-
-      <Card style={{marginBottom:16}}>
-        <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-          <select value={month} onChange={e=>setMonth(e.target.value)} style={{...inp,width:160}}>
+      <Card style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <select value={month} onChange={e => setMonth(e.target.value)} style={{ ...inp, width: 160 }}>
             <option value="">All Months</option>
-            {monthOptions().map(o=><option key={o.val} value={o.val}>{o.label}</option>)}
+            {monthOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
           </select>
-          <select value={partyF} onChange={e=>setPartyF(e.target.value)} style={{...inp,width:180}}>
+          <select value={partyF} onChange={e => setPartyF(e.target.value)} style={{ ...inp, width: 180 }}>
             <option value="">All Parties</option>
-            {parties.map(p=><option key={p} value={p}>{p}</option>)}
+            {parties.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-          <select value={daysF} onChange={e=>setDaysF(e.target.value)} style={{...inp,width:180}}>
+          <select value={daysF} onChange={e => setDaysF(e.target.value)} style={{ ...inp, width: 180 }}>
             <option value="">All Days</option>
             <option value="15">More than 15 days</option>
             <option value="30">More than 30 days</option>
           </select>
-          <Btn onClick={() => setShowOpeningForm(true)} color="#6a1b9a">
-  + Add Opening Pending
-</Btn>
+          <Btn onClick={() => setShowOpeningForm(true)} color="#6a1b9a">+ Add Opening Pending</Btn>
         </div>
       </Card>
 
-      <Card style={{overflowX:"auto"}}>
-        {pending.length===0 ? <EmptyState text="No pending payments! 🎉" /> : (
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-            <thead><tr style={{background:"#f8f8f8",borderBottom:"2px solid #eee"}}>
-              {["Party","Mobile","Trip Date","Truck","Freight","Received","Pending","Days Pending"].map(h=>(
-                <th key={h} style={{textAlign:h==="Freight"||h==="Received"||h==="Pending"?"right":"left",
-                  padding:"10px 12px",color:"#666",fontWeight:700,fontSize:12,textTransform:"uppercase",whiteSpace:"nowrap"}}>{h}</th>
-              ))}
-            </tr></thead>
-            <tbody>{pending.map(t=>{
-              const days = daysDiff(t.date);
-              return (
-                <tr key={t.id} style={{borderBottom:"1px solid #f0f0f0",
-                  background:days>30?"#fff8f8":days>15?"#fffbf0":"#fff"}}>
-                  <td style={{padding:"10px 12px",fontWeight:600}}>{t.partyName||"-"}</td>
-                  <td style={{padding:"10px 12px"}}>
-                    {t.partyMobile&&<a href={`tel:${t.partyMobile}`} style={{color:"#1565c0"}}>{t.partyMobile}</a>}
-                  </td>
-                  <td style={{padding:"10px 12px"}}>{t.date}</td>
-                  <td style={{padding:"10px 12px"}}>{t.truckNumber}</td>
-                  <td style={{padding:"10px 12px",textAlign:"right"}}>{fmt(t.freight)}</td>
-                  <td style={{padding:"10px 12px",textAlign:"right"}}>{fmt((Number(t.advance)||0)+(Number(t.paymentReceived)||0))}</td>
-                  <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:"#c62828"}}>{fmt(t.pending)}</td>
-                  <td style={{padding:"10px 12px"}}>
-                    <Badge color={days>30?"red":days>15?"orange":"gray"}>{days}d</Badge>
-                  </td>
-                </tr>
-              );
-            })}</tbody>
+      <Card style={{ overflowX: "auto" }}>
+        {pending.length === 0 ? <EmptyState text="No pending payments! 🎉" /> : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#f8f8f8", borderBottom: "2px solid #eee" }}>
+                {["Party", "Mobile", "Trip Date", "Truck", "Freight", "Received", "Pending", "Days Pending"].map(h => (
+                  <th key={h} style={{ textAlign: h === "Freight" || h === "Received" || h === "Pending" ? "right" : "left", padding: "10px 12px", color: "#666", fontWeight: 700, fontSize: 12, textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pending.map(t => {
+                const days = daysDiff(t.date);
+                return (
+                  <tr key={t.id} style={{ borderBottom: "1px solid #f0f0f0", background: days > 30 ? "#fff8f8" : days > 15 ? "#fffbf0" : "#fff" }}>
+                    <td style={{ padding: "10px 12px", fontWeight: 600 }}>{t.partyName || "-"}</td>
+                    <td style={{ padding: "10px 12px" }}>{t.partyMobile && <a href={`tel:${t.partyMobile}`} style={{ color: "#1565c0" }}>{t.partyMobile}</a>}</td>
+                    <td style={{ padding: "10px 12px" }}>{t.date}</td>
+                    <td style={{ padding: "10px 12px" }}>{t.truckNumber}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmt(t.freight)}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmt((Number(t.advance) || 0) + (Number(t.paymentReceived) || 0))}</td>
+                    <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: "#c62828" }}>{fmt(t.pending)}</td>
+                    <td style={{ padding: "10px 12px" }}><Badge color={days > 30 ? "red" : days > 15 ? "orange" : "gray"}>{days}d</Badge></td>
+                  </tr>
+                );
+              })}
+            </tbody>
           </table>
         )}
       </Card>
-      <Modal
-  open={showOpeningForm}
-  onClose={() => setShowOpeningForm(false)}
-  title="Add Opening Pending"
->
-  <Input
-    label="Party Name"
-    value={openingForm.partyName}
-    onChange={e=>setOpeningForm(p=>({...p,partyName:e.target.value}))}
-    list="opening-party-list"
-  />
 
-  <datalist id="opening-party-list">
-    {data.parties.map(p => (
-      <option key={p.id} value={p.name} />
-    ))}
-  </datalist>
-
-  <Input
-    label="Pending Amount (₹)"
-    type="number"
-    value={openingForm.amount}
-    onChange={e=>setOpeningForm(p=>({...p,amount:e.target.value}))}
-  />
-
-  <Textarea
-    label="Remarks"
-    value={openingForm.remarks}
-    onChange={e=>setOpeningForm(p=>({...p,remarks:e.target.value}))}
-  />
-
-  <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:8}}>
-    <Btn outline onClick={() => setShowOpeningForm(false)}>Cancel</Btn>
-    <Btn onClick={saveOpeningPending}>Save Opening Pending</Btn>
-  </div>
-</Modal>
+      <Modal open={showOpeningForm} onClose={() => setShowOpeningForm(false)} title="Add Opening Pending">
+        <Input label="Party Name" value={openingForm.partyName} onChange={e => setOpeningForm(p => ({ ...p, partyName: e.target.value }))} list="opening-party-list" />
+        <datalist id="opening-party-list">
+          {data.parties.map(p => (<option key={p.id} value={p.name} />))}
+        </datalist>
+        <Input label="Pending Amount (₹)" type="number" value={openingForm.amount} onChange={e => setOpeningForm(p => ({ ...p, amount: e.target.value }))} />
+        <Textarea label="Remarks" value={openingForm.remarks} onChange={e => setOpeningForm(p => ({ ...p, remarks: e.target.value }))} />
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+          <Btn outline onClick={() => setShowOpeningForm(false)}>Cancel</Btn>
+          <Btn onClick={saveOpeningPending}>Save Opening Pending</Btn>
+        </div>
+      </Modal>
     </div>
   );
 }
 
+// ============================================================
+// INVOICE PAGE
+// ============================================================
 function InvoicePage({ data, update }) {
   const [partyF, setPartyF] = useState("");
   const [month, setMonth] = useState(currentMonth);
@@ -2128,7 +2085,7 @@ function InvoicePage({ data, update }) {
     } catch { return []; }
   });
 
-  const parties = [...new Set(data.trips.map(t=>t.partyName).filter(Boolean))];
+  const parties = [...new Set(data.trips.map(t => t.partyName).filter(Boolean))];
 
   const saveInvoiceToHistory = (inv) => {
     const history = [...invoiceHistory, { ...inv, generatedAt: new Date().toISOString() }];
@@ -2138,29 +2095,24 @@ function InvoicePage({ data, update }) {
 
   const generateInvoice = () => {
     if (!partyF) return alert("Select a party");
-    const trips = data.trips.filter(t=>t.partyName===partyF&&tripMonth(t)===month);
+    const trips = data.trips.filter(t => t.partyName === partyF && tripMonth(t) === month);
     if (!trips.length) return alert("No trips found for this party/month");
-    
-    // Use manual bill number or generate default
     let billNo = manualBillNo;
     if (!billNo) {
-      billNo = `BTC/${new Date().getFullYear()}/${String((data.invoiceCounter||1)).padStart(4,"0")}`;
-      update("invoiceCounter",(data.invoiceCounter||1)+1);
+      billNo = `BTC/${new Date().getFullYear()}/${String((data.invoiceCounter || 1)).padStart(4, "0")}`;
+      update("invoiceCounter", (data.invoiceCounter || 1) + 1);
     }
-    
     const inv = {
-      billNo, 
-      date: new Date().toISOString().slice(0,10),
-      party: data.parties.find(p=>p.name===partyF)||{name:partyF},
+      billNo, date: new Date().toISOString().slice(0, 10),
+      party: data.parties.find(p => p.name === partyF) || { name: partyF },
       trips, month,
-      totalFreight: trips.reduce((s,t)=>s+(Number(t.freight)||0),0),
-      totalReceived: trips.reduce((s,t)=>s+(Number(t.advance)||0)+(Number(t.paymentReceived)||0),0),
-      totalPending: trips.reduce((s,t)=>s+(Number(t.pending)||0),0),
+      totalFreight: trips.reduce((s, t) => s + (Number(t.freight) || 0), 0),
+      totalReceived: trips.reduce((s, t) => s + (Number(t.advance) || 0) + (Number(t.paymentReceived) || 0), 0),
+      totalPending: trips.reduce((s, t) => s + (Number(t.pending) || 0), 0),
     };
-    
     saveInvoiceToHistory(inv);
     setPreview(inv);
-    setManualBillNo(""); // Reset after generation
+    setManualBillNo("");
   };
 
   const deleteInvoice = (index) => {
@@ -2170,7 +2122,6 @@ function InvoicePage({ data, update }) {
     localStorage.setItem("bhukker_invoice_history", JSON.stringify(newHistory));
   };
 
-  // Filter history by month
   const historyByMonth = {};
   invoiceHistory.forEach(inv => {
     const m = inv.month;
@@ -2180,63 +2131,53 @@ function InvoicePage({ data, update }) {
 
   return (
     <div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-        <h2 style={{margin:0,fontSize:22,fontWeight:700,color:"#1a1a2e"}}>Invoice / Bill Generator</h2>
-        <Btn onClick={() => setShowHistory(!showHistory)} color="#6a1b9a">
-          {showHistory ? "📝 New Invoice" : "📜 Invoice History"}
-        </Btn>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1a1a2e" }}>Invoice / Bill Generator</h2>
+        <Btn onClick={() => setShowHistory(!showHistory)} color="#6a1b9a">{showHistory ? "📝 New Invoice" : "📜 Invoice History"}</Btn>
       </div>
 
       {!showHistory ? (
-        <Card style={{marginBottom:20}}>
-          <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"flex-end"}}>
-            <div style={{flex:1,minWidth:200}}>
+        <Card style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
               <Field label="Select Party">
-                <select value={partyF} onChange={e=>setPartyF(e.target.value)} style={inp}>
+                <select value={partyF} onChange={e => setPartyF(e.target.value)} style={inp}>
                   <option value="">Choose Party...</option>
-                  {parties.map(p=><option key={p} value={p}>{p}</option>)}
+                  {parties.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </Field>
             </div>
-            <div style={{flex:1,minWidth:160}}>
+            <div style={{ flex: 1, minWidth: 160 }}>
               <Field label="Month">
-                <select value={month} onChange={e=>setMonth(e.target.value)} style={inp}>
-                  {monthOptions().map(o=><option key={o.val} value={o.val}>{o.label}</option>)}
+                <select value={month} onChange={e => setMonth(e.target.value)} style={inp}>
+                  {monthOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
                 </select>
               </Field>
             </div>
-            <div style={{flex:1,minWidth:200}}>
+            <div style={{ flex: 1, minWidth: 200 }}>
               <Field label="Bill Number (Optional)">
-                <input 
-                  type="text" 
-                  value={manualBillNo} 
-                  onChange={e=>setManualBillNo(e.target.value)}
-                  placeholder="Leave empty for auto" 
-                  style={inp} 
-                />
+                <input type="text" value={manualBillNo} onChange={e => setManualBillNo(e.target.value)} placeholder="Leave empty for auto" style={inp} />
               </Field>
             </div>
-            <div style={{paddingBottom:14}}>
+            <div style={{ paddingBottom: 14 }}>
               <Btn onClick={generateInvoice} color="#1a1a2e">Generate Invoice</Btn>
             </div>
           </div>
         </Card>
       ) : (
         <Card>
-          <div style={{fontWeight:700,fontSize:15,marginBottom:14}}>Invoice History</div>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Invoice History</div>
           {Object.keys(historyByMonth).sort().reverse().map(month => (
-            <div key={month} style={{marginBottom:20}}>
-              <div style={{fontSize:14,fontWeight:700,color:"#1565c0",marginBottom:10,background:"#e3f2fd",padding:"6px 12px",borderRadius:6}}>
-                {getMonthLabel(month)}
-              </div>
+            <div key={month} style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#1565c0", marginBottom: 10, background: "#e3f2fd", padding: "6px 12px", borderRadius: 6 }}>{getMonthLabel(month)}</div>
               {historyByMonth[month].map((inv, idx) => (
-                <div key={idx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #f0f0f0"}}>
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f0f0f0" }}>
                   <div>
-                    <div style={{fontWeight:600}}>Bill No: {inv.billNo}</div>
-                    <div style={{fontSize:12,color:"#888"}}>Party: {inv.party.name} · Date: {inv.date}</div>
-                    <div style={{fontSize:12}}>Amount: {fmt(inv.totalFreight)} | Pending: {fmt(inv.totalPending)}</div>
+                    <div style={{ fontWeight: 600 }}>Bill No: {inv.billNo}</div>
+                    <div style={{ fontSize: 12, color: "#888" }}>Party: {inv.party.name} · Date: {inv.date}</div>
+                    <div style={{ fontSize: 12 }}>Amount: {fmt(inv.totalFreight)} | Pending: {fmt(inv.totalPending)}</div>
                   </div>
-                  <div style={{display:"flex",gap:8}}>
+                  <div style={{ display: "flex", gap: 8 }}>
                     <Btn small outline onClick={() => setPreview(inv)}>View</Btn>
                     <Btn small danger onClick={() => deleteInvoice(idx)}>Del</Btn>
                   </div>
@@ -2253,20 +2194,21 @@ function InvoicePage({ data, update }) {
   );
 }
 
+// ============================================================
+// INVOICE PREVIEW
+// ============================================================
 function InvoicePreview({ inv, settings, onClose }) {
   const [showReceivedDates, setShowReceivedDates] = useState(true);
-  
-  // Bank details for invoice
+
   const bankDetails = {
     bankName: "IDBI BANK",
     accountNumber: "0121102000039835",
     ifscCode: "IBKL0000121",
-    upiNumber: "9812181416@ibl", // You can change this to actual UPI ID
+    upiNumber: "9812181416@ibl",
     upiPhone: "9812181416"
   };
-  
+
   const printInvoice = () => {
-    const printContent = document.getElementById("invoice-print");
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -2274,128 +2216,17 @@ function InvoicePreview({ inv, settings, onClose }) {
         <head>
           <title>Invoice ${inv.billNo}</title>
           <style>
-            @page {
-              size: A4;
-              margin: 1.5cm;
-            }
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body {
-              font-family: 'Times New Roman', Arial, sans-serif;
-              margin: 0;
-              padding: 0;
-              font-size: 12px;
-              line-height: 1.4;
-              color: #000;
-              background: #fff;
-            }
-            .invoice-container {
-              max-width: 100%;
-              margin: 0 auto;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin: 15px 0;
-            }
-            th, td {
-              border: 1px solid #000;
-              padding: 8px 10px;
-              text-align: left;
-              vertical-align: top;
-            }
-            th {
-              background-color: #f0f0f0;
-              font-weight: bold;
-              text-align: center;
-            }
-            td:last-child, th:last-child {
-              text-align: right;
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 20px;
-              border-bottom: 2px solid #000;
-              padding-bottom: 10px;
-            }
-            .company-name {
-              font-size: 22px;
-              font-weight: bold;
-              letter-spacing: 2px;
-            }
-            .company-details {
-              font-size: 10px;
-              margin-top: 5px;
-            }
-            .bill-details {
-              margin: 15px 0;
-              display: flex;
-              justify-content: space-between;
-            }
-            .footer {
-              margin-top: 30px;
-              display: flex;
-              justify-content: space-between;
-            }
-            .signature {
-              text-align: center;
-              margin-top: 40px;
-            }
-            .signature-line {
-              border-top: 1px solid #000;
-              width: 200px;
-              margin-top: 30px;
-              padding-top: 5px;
-            }
-            .received-payments {
-              margin-top: 20px;
-              font-size: 11px;
-            }
-            .received-payments table {
-              width: 60%;
-              margin: 10px 0;
-            }
-            .received-payments th, .received-payments td {
-              border: 1px solid #ccc;
-              padding: 5px 8px;
-            }
-            .bank-details {
-              margin-top: 20px;
-              padding: 10px;
-              background: #f8f8f8;
-              border: 1px solid #ddd;
-              font-size: 10px;
-            }
-            .bank-details table {
-              width: 100%;
-              border: none;
-              margin: 5px 0;
-            }
-            .bank-details td {
-              border: none;
-              padding: 4px 8px;
-            }
-            .no-print {
-              display: none;
-            }
-            @media print {
-              .no-print {
-                display: none;
-              }
-              body {
-                margin: 0;
-                padding: 0;
-              }
-              .received-payments {
-                page-break-inside: avoid;
-              }
-              .bank-details {
-                page-break-inside: avoid;
-              }
-            }
+            @page { size: A4; margin: 1.5cm; }
+            body { font-family: 'Times New Roman', Arial, sans-serif; margin: 0; padding: 0; font-size: 12px; line-height: 1.4; color: #000; background: #fff; }
+            table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+            th, td { border: 1px solid #000; padding: 8px 10px; text-align: left; vertical-align: top; }
+            th { background-color: #f0f0f0; font-weight: bold; text-align: center; }
+            td:last-child, th:last-child { text-align: right; }
+            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+            .company-name { font-size: 22px; font-weight: bold; letter-spacing: 2px; }
+            .bank-details { margin-top: 20px; padding: 10px; background: #f8f8f8; border: 1px solid #ddd; font-size: 10px; }
+            .no-print { display: none; }
+            @media print { .no-print { display: none; } }
           </style>
         </head>
         <body>
@@ -2411,633 +2242,139 @@ function InvoicePreview({ inv, settings, onClose }) {
     printWindow.onafterprint = () => printWindow.close();
   };
 
-  // Get payment history for this party and month
   let paymentHistory = [];
   try {
     const savedPayments = localStorage.getItem("bhukker_transport_v1");
     if (savedPayments) {
       const parsed = JSON.parse(savedPayments);
-      paymentHistory = (parsed.payments || []).filter(p => 
-        p.partyName === inv.party.name && p.date?.slice(0,7) === inv.month
-      );
+      paymentHistory = (parsed.payments || []).filter(p => p.partyName === inv.party.name && p.date?.slice(0, 7) === inv.month);
     }
-  } catch(e) {}
+  } catch (e) { }
 
-  // Get received amounts from trips
   const receivedFromTrips = inv.trips.reduce((sum, t) => sum + (Number(t.advance) || 0) + (Number(t.paymentReceived) || 0), 0);
 
   return (
     <div>
-      <div style={{display:"flex", gap:10, marginBottom:16, justifyContent:"flex-end"}} className="no-print">
-        <Btn onClick={() => setShowReceivedDates(!showReceivedDates)} outline>
-          {showReceivedDates ? "Hide" : "Show"} Received Details
-        </Btn>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, justifyContent: "flex-end" }} className="no-print">
+        <Btn onClick={() => setShowReceivedDates(!showReceivedDates)} outline>{showReceivedDates ? "Hide" : "Show"} Received Details</Btn>
         <Btn onClick={printInvoice}>🖨 Print Invoice</Btn>
         <Btn outline onClick={onClose}>Close</Btn>
       </div>
-      
+
       <div id="invoice-print-content">
-        <div style={{background:"#fff", padding:"20px"}}>
-          {/* Header */}
-          <div style={{borderBottom:"3px solid #1a1a2e", paddingBottom:"16px", marginBottom:"16px"}}>
-            <div style={{display:"flex", justifyContent:"space-between", fontSize:"11px", color:"#555", marginBottom:"8px"}}>
+        <div style={{ background: "#fff", padding: "20px" }}>
+          <div style={{ borderBottom: "3px solid #1a1a2e", paddingBottom: "16px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#555", marginBottom: "8px" }}>
               <div>GSTIN: {settings.gstin}</div>
               <div>{settings.jurisdiction}</div>
               <div>Ph. {settings.phone}</div>
             </div>
-            <div style={{textAlign:"center"}}>
-              <div style={{fontSize:"24px", fontWeight:"900", letterSpacing:"2px", color:"#1a1a2e"}}>{settings.companyName}</div>
-              <div style={{fontSize:"12px", color:"#555", letterSpacing:"1px", marginTop:"4px"}}>{settings.tagline}</div>
-              <div style={{fontSize:"10px", color:"#777", marginTop:"4px"}}>{settings.address}</div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "24px", fontWeight: "900", letterSpacing: "2px", color: "#1a1a2e" }}>{settings.companyName}</div>
+              <div style={{ fontSize: "12px", color: "#555", letterSpacing: "1px", marginTop: "4px" }}>{settings.tagline}</div>
+              <div style={{ fontSize: "10px", color: "#777", marginTop: "4px" }}>{settings.address}</div>
             </div>
           </div>
 
-          {/* Bill To & Bill No */}
-          <div style={{display:"flex", justifyContent:"space-between", marginBottom:"16px", fontSize:"12px"}}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px", fontSize: "12px" }}>
             <div>
-              <div style={{fontWeight:"700", fontSize:"14px", marginBottom:"4px"}}>Bill No: {inv.billNo}</div>
+              <div style={{ fontWeight: "700", fontSize: "14px", marginBottom: "4px" }}>Bill No: {inv.billNo}</div>
               <div><strong>To:</strong> {inv.party.name}</div>
               {inv.party.contact && <div>{inv.party.contact}</div>}
               {inv.party.mobile && <div>Mobile: {inv.party.mobile}</div>}
               {inv.party.gst && <div>GST: {inv.party.gst}</div>}
             </div>
-            <div style={{textAlign:"right"}}>
+            <div style={{ textAlign: "right" }}>
               <div><strong>Date:</strong> {inv.date}</div>
               <div><strong>Period:</strong> {getMonthLabel(inv.month)}</div>
             </div>
           </div>
 
-          {/* Trip Details Table */}
-          <table style={{width:"100%", borderCollapse:"collapse", fontSize:"11px", marginBottom:"16px"}}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", marginBottom: "16px" }}>
             <thead>
-              <tr style={{background:"#1a1a2e", color:"#fff"}}>
-                <th style={{padding:"8px 10px", textAlign:"center", border:"1px solid #000"}}>Sr No</th>
-                <th style={{padding:"8px 10px", textAlign:"center", border:"1px solid #000"}}>Date</th>
-                <th style={{padding:"8px 10px", textAlign:"center", border:"1px solid #000"}}>Truck No</th>
-                <th style={{padding:"8px 10px", textAlign:"center", border:"1px solid #000"}}>From</th>
-                <th style={{padding:"8px 10px", textAlign:"center", border:"1px solid #000"}}>To</th>
-                <th style={{padding:"8px 10px", textAlign:"center", border:"1px solid #000"}}>Description</th>
-                <th style={{padding:"8px 10px", textAlign:"right", border:"1px solid #000"}}>Freight (₹)</th>
+              <tr style={{ background: "#1a1a2e", color: "#fff" }}>
+                <th style={{ padding: "8px 10px", textAlign: "center", border: "1px solid #000" }}>Sr No</th>
+                <th style={{ padding: "8px 10px", textAlign: "center", border: "1px solid #000" }}>Date</th>
+                <th style={{ padding: "8px 10px", textAlign: "center", border: "1px solid #000" }}>Truck No</th>
+                <th style={{ padding: "8px 10px", textAlign: "center", border: "1px solid #000" }}>From</th>
+                <th style={{ padding: "8px 10px", textAlign: "center", border: "1px solid #000" }}>To</th>
+                <th style={{ padding: "8px 10px", textAlign: "center", border: "1px solid #000" }}>Description</th>
+                <th style={{ padding: "8px 10px", textAlign: "right", border: "1px solid #000" }}>Freight (₹)</th>
               </tr>
             </thead>
             <tbody>
               {inv.trips.map((t, i) => (
-                <tr key={t.id} style={{borderBottom:"1px solid #ddd", background:i%2?"#f9f9f9":"#fff"}}>
-                  <td style={{padding:"7px 10px", textAlign:"center", border:"1px solid #000"}}>{i+1}</td>
-                  <td style={{padding:"7px 10px", border:"1px solid #000"}}>{t.date}</td>
-                  <td style={{padding:"7px 10px", fontWeight:"600", border:"1px solid #000"}}>{t.truckNumber}</td>
-                  <td style={{padding:"7px 10px", border:"1px solid #000"}}>{t.from}</td>
-                  <td style={{padding:"7px 10px", border:"1px solid #000"}}>{t.to}</td>
-                  <td style={{padding:"7px 10px", border:"1px solid #000"}}>{t.material}</td>
-                  <td style={{padding:"7px 10px", textAlign:"right", fontWeight:"600", border:"1px solid #000"}}>₹{fmtN(t.freight)}</td>
+                <tr key={t.id} style={{ borderBottom: "1px solid #ddd", background: i % 2 ? "#f9f9f9" : "#fff" }}>
+                  <td style={{ padding: "7px 10px", textAlign: "center", border: "1px solid #000" }}>{i + 1}</td>
+                  <td style={{ padding: "7px 10px", border: "1px solid #000" }}>{t.date}</td>
+                  <td style={{ padding: "7px 10px", fontWeight: "600", border: "1px solid #000" }}>{t.truckNumber}</td>
+                  <td style={{ padding: "7px 10px", border: "1px solid #000" }}>{t.from}</td>
+                  <td style={{ padding: "7px 10px", border: "1px solid #000" }}>{t.to}</td>
+                  <td style={{ padding: "7px 10px", border: "1px solid #000" }}>{t.material}</td>
+                  <td style={{ padding: "7px 10px", textAlign: "right", fontWeight: "600", border: "1px solid #000" }}>₹{fmtN(t.freight)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          {/* Summary */}
-          <div style={{display:"flex", justifyContent:"flex-end", marginBottom:"20px"}}>
-            <div style={{width:"280px"}}>
-              <div style={{display:"flex", justifyContent:"space-between", padding:"6px 12px", borderBottom:"1px solid #eee"}}>
-                <span>Total Freight</span>
-                <span style={{fontWeight:"bold"}}>₹{fmtN(inv.totalFreight)}</span>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "20px" }}>
+            <div style={{ width: "280px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 12px", borderBottom: "1px solid #eee" }}>
+                <span>Total Freight</span><span style={{ fontWeight: "bold" }}>₹{fmtN(inv.totalFreight)}</span>
               </div>
-              <div style={{display:"flex", justifyContent:"space-between", padding:"6px 12px", borderBottom:"1px solid #eee"}}>
-                <span>Amount Received</span>
-                <span style={{color:"#2e7d32", fontWeight:"bold"}}>₹{fmtN(inv.totalReceived)}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 12px", borderBottom: "1px solid #eee" }}>
+                <span>Amount Received</span><span style={{ color: "#2e7d32", fontWeight: "bold" }}>₹{fmtN(inv.totalReceived)}</span>
               </div>
-              <div style={{display:"flex", justifyContent:"space-between", padding:"8px 12px", background:"#f5f5f5", fontWeight:"bold"}}>
-                <span>Balance Payable</span>
-                <span style={{color:"#c62828"}}>₹{fmtN(inv.totalPending)}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", background: "#f5f5f5", fontWeight: "bold" }}>
+                <span>Balance Payable</span><span style={{ color: "#c62828" }}>₹{fmtN(inv.totalPending)}</span>
               </div>
             </div>
           </div>
 
-          {/* Bank Details Section - NEW */}
-          <div className="bank-details" style={{marginTop:"20px", padding:"12px", background:"#f8f8f8", border:"1px solid #ddd", borderRadius:"4px"}}>
-            <div style={{fontWeight:"bold", fontSize:"12px", marginBottom:"8px", borderBottom:"1px solid #999", paddingBottom:"4px"}}>
-              💳 BANK PAYMENT DETAILS
-            </div>
-            <table style={{width:"100%", border:"none", fontSize:"10px"}}>
+          <div className="bank-details" style={{ marginTop: "20px", padding: "12px", background: "#f8f8f8", border: "1px solid #ddd", borderRadius: "4px" }}>
+            <div style={{ fontWeight: "bold", fontSize: "12px", marginBottom: "8px", borderBottom: "1px solid #999", paddingBottom: "4px" }}>💳 BANK PAYMENT DETAILS</div>
+            <table style={{ width: "100%", border: "none", fontSize: "10px" }}>
               <tbody>
-                <tr>
-                  <td style={{width:"120px", padding:"4px 8px", border:"none", fontWeight:"bold"}}>Bank Name:</td>
-                  <td style={{padding:"4px 8px", border:"none"}}>{bankDetails.bankName}</td>
-                  <td style={{width:"120px", padding:"4px 8px", border:"none", fontWeight:"bold"}}>A/C No.:</td>
-                  <td style={{padding:"4px 8px", border:"none"}}>{bankDetails.accountNumber}</td>
-                </tr>
-                <tr>
-                  <td style={{padding:"4px 8px", border:"none", fontWeight:"bold"}}>IFSC Code:</td>
-                  <td style={{padding:"4px 8px", border:"none"}}>{bankDetails.ifscCode}</td>
-                  <td style={{padding:"4px 8px", border:"none", fontWeight:"bold"}}>UPI ID / No.:</td>
-                  <td style={{padding:"4px 8px", border:"none"}}>{bankDetails.upiPhone}</td>
-                </tr>
+                <tr><td style={{ width: "120px", padding: "4px 8px", fontWeight: "bold" }}>Bank Name:</td><td>{bankDetails.bankName}</td><td style={{ width: "120px", padding: "4px 8px", fontWeight: "bold" }}>A/C No.:</td><td>{bankDetails.accountNumber}</td></tr>
+                <tr><td style={{ padding: "4px 8px", fontWeight: "bold" }}>IFSC Code:</td><td>{bankDetails.ifscCode}</td><td style={{ padding: "4px 8px", fontWeight: "bold" }}>UPI ID / No.:</td><td>{bankDetails.upiPhone}</td></tr>
               </tbody>
             </table>
-            <div style={{marginTop:"8px", fontSize:"10px", color:"#555", textAlign:"center", borderTop:"1px dashed #ccc", paddingTop:"6px"}}>
-              📱 UPI Payment: {bankDetails.upiPhone} (Google Pay / PhonePe / Paytm)
-            </div>
+            <div style={{ marginTop: "8px", fontSize: "10px", color: "#555", textAlign: "center", borderTop: "1px dashed #ccc", paddingTop: "6px" }}>📱 UPI Payment: {bankDetails.upiPhone} (Google Pay / PhonePe / Paytm)</div>
           </div>
 
-          {/* Received Payments Details */}
           {showReceivedDates && (paymentHistory.length > 0 || receivedFromTrips > 0) && (
-            <div className="received-payments" style={{marginTop:"20px"}}>
-              <div style={{fontWeight:"bold", fontSize:"12px", marginBottom:"8px", borderBottom:"1px solid #000", paddingBottom:"4px"}}>
-                Payment Received Details
-              </div>
-              <table style={{width:"70%", fontSize:"10px"}}>
-                <thead>
-                  <tr>
-                    <th style={{border:"1px solid #000", padding:"5px 8px", textAlign:"center"}}>Date</th>
-                    <th style={{border:"1px solid #000", padding:"5px 8px", textAlign:"center"}}>Mode</th>
-                    <th style={{border:"1px solid #000", padding:"5px 8px", textAlign:"center"}}>Reference</th>
-                    <th style={{border:"1px solid #000", padding:"5px 8px", textAlign:"right"}}>Amount (₹)</th>
-                  </tr>
-                </thead>
+            <div className="received-payments" style={{ marginTop: "20px" }}>
+              <div style={{ fontWeight: "bold", fontSize: "12px", marginBottom: "8px", borderBottom: "1px solid #000", paddingBottom: "4px" }}>Payment Received Details</div>
+              <table style={{ width: "70%", fontSize: "10px" }}>
+                <thead><tr><th style={{ border: "1px solid #000", padding: "5px 8px" }}>Date</th><th style={{ border: "1px solid #000", padding: "5px 8px" }}>Mode</th><th style={{ border: "1px solid #000", padding: "5px 8px" }}>Reference</th><th style={{ border: "1px solid #000", padding: "5px 8px", textAlign: "right" }}>Amount</th></tr></thead>
                 <tbody>
                   {paymentHistory.map((p, idx) => (
-                    <tr key={idx}>
-                      <td style={{border:"1px solid #000", padding:"5px 8px"}}>{p.date}</td>
-                      <td style={{border:"1px solid #000", padding:"5px 8px"}}>{p.mode}</td>
-                      <td style={{border:"1px solid #000", padding:"5px 8px"}}>{p.reference || "-"}</td>
-                      <td style={{border:"1px solid #000", padding:"5px 8px", textAlign:"right"}}>₹{fmtN(p.amount)}</td>
-                    </tr>
+                    <tr key={idx}><td style={{ border: "1px solid #000", padding: "5px 8px" }}>{p.date}</td><td style={{ border: "1px solid #000", padding: "5px 8px" }}>{p.mode}</td><td style={{ border: "1px solid #000", padding: "5px 8px" }}>{p.reference || "-"}</td><td style={{ border: "1px solid #000", padding: "5px 8px", textAlign: "right" }}>₹{fmtN(p.amount)}</td></tr>
                   ))}
                   {paymentHistory.length === 0 && receivedFromTrips > 0 && (
-                    <tr>
-                      <td colSpan="4" style={{border:"1px solid #000", padding:"5px 8px", textAlign:"center"}}>
-                        Received via trip advances: ₹{fmtN(receivedFromTrips)}
-                      </td>
-                    </tr>
+                    <tr><td colSpan="4" style={{ border: "1px solid #000", padding: "5px 8px", textAlign: "center" }}>Received via trip advances: ₹{fmtN(receivedFromTrips)}</td></tr>
                   )}
                 </tbody>
-                <tfoot>
-                  <tr style={{fontWeight:"bold"}}>
-                    <td colSpan="3" style={{border:"1px solid #000", padding:"5px 8px", textAlign:"right"}}>Total Received:</td>
-                    <td style={{border:"1px solid #000", padding:"5px 8px", textAlign:"right"}}>₹{fmtN(inv.totalReceived)}</td>
-                  </tr>
-                </tfoot>
+                <tfoot><tr style={{ fontWeight: "bold" }}><td colSpan="3" style={{ border: "1px solid #000", padding: "5px 8px", textAlign: "right" }}>Total Received:</td><td style={{ border: "1px solid #000", padding: "5px 8px", textAlign: "right" }}>₹{fmtN(inv.totalReceived)}</td></tr></tfoot>
               </table>
             </div>
           )}
 
-          {/* Footer */}
-          <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginTop:"30px"}}>
-            <div style={{fontSize:"9px", color:"#777"}}>
-              <div>Subject to Panipat Jurisdiction only</div>
-              <div>E. &amp; O. E.</div>
-            </div>
-            <div style={{textAlign:"center"}}>
-              <div style={{borderTop:"1px solid #000", paddingTop:"6px", width:"200px", fontSize:"10px"}}>
-                For {settings.companyName}<br/>Authorized Signatory
-              </div>
-            </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "30px" }}>
+            <div style={{ fontSize: "9px", color: "#777" }}><div>Subject to Panipat Jurisdiction only</div><div>E. &amp; O. E.</div></div>
+            <div style={{ textAlign: "center" }}><div style={{ borderTop: "1px solid #000", paddingTop: "6px", width: "200px", fontSize: "10px" }}>For {settings.companyName}<br />Authorized Signatory</div></div>
           </div>
-          
-          {/* Checked by / Prepared by line */}
-          <div style={{display:"flex", justifyContent:"space-between", marginTop:"20px", fontSize:"9px", color:"#888", borderTop:"1px solid #eee", paddingTop:"10px"}}>
-            <div>Checked by: _________________</div>
-            <div>Prepared by: _________________</div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px", fontSize: "9px", color: "#888", borderTop: "1px solid #eee", paddingTop: "10px" }}>
+            <div>Checked by: _________________</div><div>Prepared by: _________________</div>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-function ReportsPage({ data }) {
-  const [month, setMonth] = useState(currentMonth);
-  const [activeTab, setActiveTab] = useState("monthly");
-  const [truckMonth, setTruckMonth] = useState(currentMonth); // Changed to currentMonth instead of ""
-  const [selectedTruckDetail, setSelectedTruckDetail] = useState(null);
-
-  const trips = data.trips.filter(t => tripMonth(t) === month);
-
-  // Function to calculate complete truck P&L (same as TrucksPage)
-  const getTruckCompletePL = (truckNumber, targetMonth) => {
-    // Get trips for the selected month ONLY
-    const allTrips = data.trips.filter(t => t.truckNumber === truckNumber);
-    const filteredTrips = allTrips.filter(t => tripMonth(t) === targetMonth);
-    
-    const tripIncome = filteredTrips.reduce((s, t) => s + (Number(t.freight) || 0), 0);
-    const tripExpenses = {
-      diesel: filteredTrips.reduce((s, t) => s + (Number(t.diesel) || 0), 0),
-      cng: filteredTrips.reduce((s, t) => s + (Number(t.cng) || 0), 0),
-      toll: filteredTrips.reduce((s, t) => s + (Number(t.toll) || 0), 0),
-      driverAdvance: filteredTrips.reduce((s, t) => s + (Number(t.driverAdvance) || 0), 0),
-      otherExpense: filteredTrips.reduce((s, t) => s + (Number(t.otherExpense) || 0), 0),
-    };
-    const totalTripExpenses = Object.values(tripExpenses).reduce((a, b) => a + b, 0);
-    
-    // General expenses for this specific truck for the selected month
-    const generalExpenses = (data.generalExpenses || []).filter(e => 
-      e.vehicleNumber === truckNumber && e.date?.slice(0,7) === targetMonth
-    );
-    const totalGeneralExpenses = generalExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-    
-    // Staff salary for driver for the selected month
-    const truckDriver = data.drivers.find(d => d.truck === truckNumber);
-    const driverSalaries = (data.staffSalaries || []).filter(s => 
-      s.staffName === truckDriver?.name && s.salaryMonth === targetMonth
-    );
-    const totalDriverSalary = driverSalaries.reduce((s, sal) => s + (Number(sal.netAmount) || 0), 0);
-    
-    const truckData = data.trucks.find(t => t.number === truckNumber);
-    
-    // EMI - monthly
-    const monthlyEmi = Number(truckData?.emiAmount) || 0;
-    
-    // Annual costs - divide by 12, but only if document is valid
-    const getMonthlyCost = (expiryDate, annualAmount) => {
-      if (!expiryDate || !annualAmount || annualAmount <= 0) return 0;
-      const expiry = new Date(expiryDate);
-      const current = new Date(targetMonth + "-01");
-      if (expiry < current) return 0;
-      return Number(annualAmount) / 12;
-    };
-    
-    const monthlyInsurance = getMonthlyCost(truckData?.insuranceExpiry, truckData?.insuranceAmount);
-    const monthlyPermit = getMonthlyCost(truckData?.permitExpiry, truckData?.permitAmount);
-    const monthlyTax = getMonthlyCost(truckData?.taxExpiry, truckData?.taxAmount);
-    const monthlyFitness = getMonthlyCost(truckData?.fitnessExpiry, truckData?.fitnessAmount);
-    
-    const totalFixedExpenses = monthlyEmi + monthlyInsurance + monthlyPermit + monthlyTax + monthlyFitness;
-    const totalExpenses = totalTripExpenses + totalGeneralExpenses + totalDriverSalary + totalFixedExpenses;
-    const netProfit = tripIncome - totalExpenses;
-    
-    return {
-      truckNumber,
-      truckData,
-      tripIncome,
-      tripExpenses: totalTripExpenses,
-      generalExpenses: totalGeneralExpenses,
-      driverSalary: totalDriverSalary,
-      fixedExpenses: totalFixedExpenses,
-      totalExpenses,
-      netProfit,
-      trips: filteredTrips.length,
-      breakdown: {
-        diesel: tripExpenses.diesel,
-        cng: tripExpenses.cng,
-        toll: tripExpenses.toll,
-        driverAdvance: tripExpenses.driverAdvance,
-        otherExpense: tripExpenses.otherExpense,
-        general: totalGeneralExpenses,
-        salary: totalDriverSalary,
-        emi: monthlyEmi,
-        insurance: monthlyInsurance,
-        permit: monthlyPermit,
-        tax: monthlyTax,
-        fitness: monthlyFitness
-      },
-      tripsList: filteredTrips,
-      generalExpensesList: generalExpenses
-    };
-  };
-
-  // Get all trucks with their P&L for selected month
-  const truckPLData = data.trucks.map(truck => {
-    const pl = getTruckCompletePL(truck.number, truckMonth);
-    return pl;
-  }).filter(pl => pl.trips > 0 || pl.generalExpenses > 0 || pl.driverSalary > 0); // Only show trucks with activity
-
-  // Sort by profit (highest first)
-  const sortedTruckPL = [...truckPLData].sort((a, b) => b.netProfit - a.netProfit);
-
-  const partyPending = {};
-  data.trips.filter(t => (Number(t.pending) || 0) > 0).forEach(t => {
-    if (!t.partyName) return;
-    partyPending[t.partyName] = (partyPending[t.partyName] || 0) + (Number(t.pending) || 0);
-  });
-
-  const monthlyData = {};
-  data.trips.forEach(t => {
-    const m = tripMonth(t);
-    if (!m) return;
-    if (!monthlyData[m]) monthlyData[m] = { freight: 0, profit: 0, trips: 0, pending: 0 };
-    monthlyData[m].freight += Number(t.freight) || 0;
-    monthlyData[m].profit += Number(t.netProfit) || 0;
-    monthlyData[m].trips++;
-  });
-  
-  data.trips.forEach(t => {
-    const m = tripMonth(t);
-    if (m && monthlyData[m]) {
-      monthlyData[m].pending += Number(t.pending) || 0;
-    }
-  });
-
-  const tabStyle = (tab) => ({
-    padding: "10px 20px",
-    border: "none",
-    background: "none",
-    cursor: "pointer",
-    fontWeight: 600,
-    fontSize: 14,
-    borderBottom: activeTab === tab ? "3px solid #1a1a2e" : "3px solid transparent",
-    color: activeTab === tab ? "#1a1a2e" : "#888"
-  });
-
-  // Truck Detail Modal Component inside ReportsPage
-  const TruckDetailView = ({ truckPL, onClose }) => {
-    const [detailMonth, setDetailMonth] = useState(truckMonth);
-    const [updatedPL, setUpdatedPL] = useState(truckPL);
-    
-    useEffect(() => {
-      const newPL = getTruckCompletePL(truckPL.truckNumber, detailMonth);
-      setUpdatedPL(newPL);
-    }, [detailMonth]);
-    
-    return (
-      <div>
-        <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16}}>
-          <div>
-            <div style={{fontSize:18, fontWeight:700}}>{updatedPL.truckNumber}</div>
-            <div style={{fontSize:12, color:"#888"}}>{updatedPL.truckData?.ownership} · {updatedPL.truckData?.fuelType}</div>
-            <div style={{fontSize:12}}>Driver: {updatedPL.truckData?.driver || "Not assigned"}</div>
-          </div>
-          <div style={{display:"flex", gap:10, alignItems:"center"}}>
-            <select value={detailMonth} onChange={e=>setDetailMonth(e.target.value)} style={{...inp, width:140, padding:"6px 10px"}}>
-              {monthOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
-            </select>
-            <Btn small outline onClick={onClose}>Close</Btn>
-          </div>
-        </div>
-        
-        {/* Summary Cards */}
-        <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:20}}>
-          <StatCard label="Trips" value={updatedPL.trips} color="blue" />
-          <StatCard label="Total Income" value={fmt(updatedPL.tripIncome)} color="green" />
-          <StatCard label="Total Expenses" value={fmt(updatedPL.totalExpenses)} color="red" />
-          <StatCard label="Net Profit/Loss" value={fmt(updatedPL.netProfit)} color={updatedPL.netProfit >= 0 ? "teal" : "red"} />
-        </div>
-        
-        {/* Expense Breakdown */}
-        <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:20}}>
-          <Card>
-            <div style={{fontWeight:700, marginBottom:12}}>🚛 Trip Expenses</div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #eee"}}>
-              <span>Diesel</span><span>{fmt(updatedPL.breakdown.diesel)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #eee"}}>
-              <span>CNG</span><span>{fmt(updatedPL.breakdown.cng)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #eee"}}>
-              <span>Toll</span><span>{fmt(updatedPL.breakdown.toll)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #eee"}}>
-              <span>Driver Advance</span><span>{fmt(updatedPL.breakdown.driverAdvance)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", marginTop:5, background:"#fff3e0", fontWeight:700}}>
-              <span>Total Trip Expenses</span><span style={{color:"#e65100"}}>{fmt(updatedPL.tripExpenses)}</span>
-            </div>
-          </Card>
-          
-          <Card>
-            <div style={{fontWeight:700, marginBottom:12}}>🏢 Other Expenses</div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #eee"}}>
-              <span>General Expenses</span><span>{fmt(updatedPL.generalExpenses)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #eee"}}>
-              <span>Driver Salary</span><span>{fmt(updatedPL.driverSalary)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #eee"}}>
-              <span>Monthly EMI</span><span>{fmt(updatedPL.breakdown.emi)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #eee"}}>
-              <span>Insurance (Monthly)</span><span>{fmt(updatedPL.breakdown.insurance)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #eee"}}>
-              <span>Permit (Monthly)</span><span>{fmt(updatedPL.breakdown.permit)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", marginTop:5, background:"#ffebee", fontWeight:700}}>
-              <span>Total Other Expenses</span><span style={{color:"#c62828"}}>{fmt(updatedPL.generalExpenses + updatedPL.driverSalary + updatedPL.breakdown.emi + updatedPL.breakdown.insurance + updatedPL.breakdown.permit + updatedPL.breakdown.tax + updatedPL.breakdown.fitness)}</span>
-            </div>
-          </Card>
-        </div>
-        
-        {/* Trip History */}
-        <Card>
-          <div style={{fontWeight:700, marginBottom:12}}>📋 Trip History ({updatedPL.trips} trips)</div>
-          {updatedPL.tripsList.length === 0 ? (
-            <EmptyState text="No trips for this period" />
-          ) : (
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%", borderCollapse:"collapse", fontSize:12}}>
-                <thead>
-                  <tr style={{background:"#f8f8f8", borderBottom:"2px solid #eee"}}>
-                    <th style={{padding:"8px", textAlign:"left"}}>Date</th>
-                    <th style={{padding:"8px", textAlign:"left"}}>Party</th>
-                    <th style={{padding:"8px", textAlign:"left"}}>Route</th>
-                    <th style={{padding:"8px", textAlign:"right"}}>Freight</th>
-                    <th style={{padding:"8px", textAlign:"right"}}>Profit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {updatedPL.tripsList.map(trip => (
-                    <tr key={trip.id} style={{borderBottom:"1px solid #f0f0f0"}}>
-                      <td style={{padding:"8px"}}>{trip.date}</td>
-                      <td style={{padding:"8px", fontWeight:500}}>{trip.partyName}</td>
-                      <td style={{padding:"8px", fontSize:11}}>{trip.from} → {trip.to}</td>
-                      <td style={{padding:"8px", textAlign:"right"}}>{fmt(trip.freight)}</td>
-                      <td style={{padding:"8px", textAlign:"right", color: (trip.netProfit || 0) >= 0 ? "#2e7d32" : "#c62828"}}>
-                        {fmt(trip.netProfit)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      </div>
-    );
-  };
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1a1a2e" }}>Reports</h2>
-        <select value={month} onChange={e => setMonth(e.target.value)} style={{ ...inp, width: 160 }}>
-          {monthOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
-        </select>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 10, borderBottom: "1px solid #eee", marginBottom: 20 }}>
-        <button style={tabStyle("monthly")} onClick={() => setActiveTab("monthly")}>📊 Monthly Summary</button>
-        <button style={tabStyle("truckwise")} onClick={() => setActiveTab("truckwise")}>🚛 Truck-wise Profit</button>
-        <button style={tabStyle("pnl")} onClick={() => setActiveTab("pnl")}>📈 Profit & Loss Statement</button>
-      </div>
-
-      {/* Monthly Summary Tab */}
-      {activeTab === "monthly" && (
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-            <Card>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Monthly Summary ({getMonthLabel(month)})</div>
-              {[
-                ["Trips", trips.length],
-                ["Total Freight", fmt(trips.reduce((s, t) => s + (Number(t.freight) || 0), 0))],
-                ["Total Expenses", fmt(trips.reduce((s, t) => s + (Number(t.diesel) || 0) + (Number(t.cng) || 0) + (Number(t.toll) || 0) + (Number(t.otherExpense) || 0), 0))],
-                ["Net Profit", fmt(trips.reduce((s, t) => s + (Number(t.netProfit) || 0), 0))],
-                ["Pending", fmt(trips.reduce((s, t) => s + (Number(t.pending) || 0), 0))],
-              ].map(([l, v]) => (
-                <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f0f0f0" }}>
-                  <span style={{ color: "#666" }}>{l}</span><span style={{ fontWeight: 700 }}>{v}</span>
-                </div>
-              ))}
-            </Card>
-
-            <Card>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Fuel Breakdown ({getMonthLabel(month)})</div>
-              {[
-                ["Diesel Expense", fmt(trips.reduce((s, t) => s + (Number(t.diesel) || 0), 0)), "orange"],
-                ["CNG Expense", fmt(trips.reduce((s, t) => s + (Number(t.cng) || 0), 0)), "teal"],
-                ["Toll Expense", fmt(trips.reduce((s, t) => s + (Number(t.toll) || 0), 0)), "blue"],
-              ].map(([l, v, c]) => (
-                <div key={l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #f0f0f0" }}>
-                  <span style={{ color: "#666" }}>{l}</span><Badge color={c}>{v}</Badge>
-                </div>
-              ))}
-            </Card>
-          </div>
-
-          <Card>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Month-wise Performance</div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: "#f8f8f8", borderBottom: "2px solid #eee" }}>
-                    {["Month", "Trips", "Freight", "Expenses", "Profit/Loss", "Pending"].map(h => (
-                      <th key={h} style={{ textAlign: h === "Month" || h === "Trips" ? "left" : "right", padding: "10px 12px", color: "#666", fontWeight: 700, fontSize: 12, textTransform: "uppercase" }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(monthlyData)
-                    .sort((a, b) => b[0].localeCompare(a[0]))
-                    .map(([m, s]) => {
-                      const mTrips = data.trips.filter(t => tripMonth(t) === m);
-                      const expenses = mTrips.reduce((sum, t) => sum + (Number(t.diesel) || 0) + (Number(t.cng) || 0) + (Number(t.toll) || 0) + (Number(t.otherExpense) || 0), 0);
-                      return (
-                        <tr key={m} style={{ borderBottom: "1px solid #f0f0f0", background: m === month ? "#f0f4ff" : "#fff" }}>
-                          <td style={{ padding: "10px 12px", fontWeight: 500 }}>{getMonthLabel(m)}</td>
-                          <td style={{ padding: "10px 12px" }}>{s.trips}</td>
-                          <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmt(s.freight)}</td>
-                          <td style={{ padding: "10px 12px", textAlign: "right", color: "#e65100" }}>{fmt(expenses)}</td>
-                          <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: s.profit >= 0 ? "#2e7d32" : "#c62828" }}>{fmt(s.profit)}</td>
-                          <td style={{ padding: "10px 12px", textAlign: "right", color: "#c62828", fontWeight: 600 }}>{fmt(s.pending)}</td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Truck-wise Profit Tab - Enhanced */}
-      {activeTab === "truckwise" && (
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>Truck Performance for {getMonthLabel(truckMonth)}</div>
-            <select value={truckMonth} onChange={e => setTruckMonth(e.target.value)} style={{ ...inp, width: 180 }}>
-              {monthOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
-            </select>
-          </div>
-          
-          {sortedTruckPL.length === 0 ? (
-            <EmptyState text="No truck activity found for selected period" />
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(380px,1fr))", gap: 16 }}>
-              {sortedTruckPL.map(truck => (
-                <Card key={truck.truckNumber} style={{ cursor: "pointer" }} onClick={() => setSelectedTruckDetail(truck)}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <div style={{ fontWeight: 700, fontSize: 16 }}>{truck.truckNumber}</div>
-                    <Badge color={truck.netProfit >= 0 ? "green" : "red"}>{fmt(truck.netProfit)}</Badge>
-                  </div>
-                  
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12, marginBottom: 8 }}>
-                    <div>
-                      <div style={{ color: "#888" }}>Trips</div>
-                      <div style={{ fontWeight: 600 }}>{truck.trips}</div>
-                    </div>
-                    <div>
-                      <div style={{ color: "#888" }}>Income</div>
-                      <div style={{ fontWeight: 600, color: "#2e7d32" }}>{fmt(truck.tripIncome)}</div>
-                    </div>
-                    <div>
-                      <div style={{ color: "#888" }}>Expenses</div>
-                      <div style={{ fontWeight: 600, color: "#c62828" }}>{fmt(truck.totalExpenses)}</div>
-                    </div>
-                    <div>
-                      <div style={{ color: "#888" }}>Margin</div>
-                      <div style={{ fontWeight: 600 }}>{truck.tripIncome > 0 ? ((truck.netProfit / truck.tripIncome) * 100).toFixed(1) : 0}%</div>
-                    </div>
-                  </div>
-                  
-                  {/* Expense breakdown summary */}
-                  <div style={{ fontSize: 11, color: "#666", borderTop: "1px solid #eee", paddingTop: 8, marginTop: 4 }}>
-                    {truck.tripExpenses > 0 && <span>Trip: {fmt(truck.tripExpenses)} </span>}
-                    {truck.generalExpenses > 0 && <span>| Gen: {fmt(truck.generalExpenses)} </span>}
-                    {truck.driverSalary > 0 && <span>| Salary: {fmt(truck.driverSalary)} </span>}
-                    {truck.fixedExpenses > 0 && <span>| Fixed: {fmt(truck.fixedExpenses)}</span>}
-                  </div>
-                  
-                  <div style={{ marginTop: 8 }}>
-                    <Btn small outline onClick={(e) => { e.stopPropagation(); setSelectedTruckDetail(truck); }}>View Details →</Btn>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-          
-          {/* Overall Summary */}
-          {sortedTruckPL.length > 0 && (
-            <Card style={{ marginTop: 20, background: "#1a1a2e", color: "#fff" }}>
-              <div style={{ fontWeight: 700, marginBottom: 10 }}>📊 Summary for {getMonthLabel(truckMonth)}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
-                <div>
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>Total Trips</div>
-                  <div style={{ fontSize: 20, fontWeight: 700 }}>{sortedTruckPL.reduce((s, t) => s + t.trips, 0)}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>Total Income</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: "#81c784" }}>{fmt(sortedTruckPL.reduce((s, t) => s + t.tripIncome, 0))}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>Total Expenses</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: "#ef9a9a" }}>{fmt(sortedTruckPL.reduce((s, t) => s + t.totalExpenses, 0))}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, opacity: 0.8 }}>Total Profit</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, color: sortedTruckPL.reduce((s, t) => s + t.netProfit, 0) >= 0 ? "#81c784" : "#ef9a9a" }}>
-                    {fmt(sortedTruckPL.reduce((s, t) => s + t.netProfit, 0))}
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* Profit & Loss Statement Tab */}
-      {activeTab === "pnl" && (
-        <ProfitLossReport data={data} month={month} />
-      )}
-      
-      {/* Truck Detail Modal */}
-      <Modal open={!!selectedTruckDetail} onClose={() => setSelectedTruckDetail(null)} title="Truck Details" wide>
-        {selectedTruckDetail && (
-          <TruckDetailView truckPL={selectedTruckDetail} onClose={() => setSelectedTruckDetail(null)} />
-        )}
-      </Modal>
-    </div>
-  );
-}
-
+// ============================================================
+// SETTINGS PAGE
+// ============================================================
 function SettingsPage({ data, update }) {
   const [s, setS] = useState(data.settings);
 
@@ -3051,36 +2388,26 @@ function SettingsPage({ data, update }) {
       exportedAt: new Date().toISOString(),
       data
     };
-
-    const blob = new Blob([JSON.stringify(backup, null, 2)], {
-      type: "application/json"
-    });
-
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-
     a.href = url;
     a.download = `bhukker-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
-
     URL.revokeObjectURL(url);
   };
 
   const importBackup = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
-
     reader.onload = () => {
       try {
         const backup = JSON.parse(reader.result);
-
         if (!backup.data) {
           alert("Invalid backup file");
           return;
         }
-
         localStorage.setItem("bhukker_transport_v1", JSON.stringify(backup.data));
         alert("Backup restored. Reloading...");
         window.location.reload();
@@ -3088,73 +2415,49 @@ function SettingsPage({ data, update }) {
         alert("Invalid backup file");
       }
     };
-
     reader.readAsText(file);
   };
 
   return (
     <div>
-      <h2 style={{margin:"0 0 20px",fontSize:22,fontWeight:700,color:"#1a1a2e"}}>Settings</h2>
-
-      <Card style={{maxWidth:600}}>
-        <div style={{fontWeight:700,fontSize:15,marginBottom:16}}>Company Information</div>
-
-        <Input label="Company Name" value={s.companyName} onChange={e=>setS(p=>({...p,companyName:e.target.value}))} />
-        <Input label="Tagline" value={s.tagline} onChange={e=>setS(p=>({...p,tagline:e.target.value}))} />
-        <Input label="GSTIN" value={s.gstin} onChange={e=>setS(p=>({...p,gstin:e.target.value}))} half />
-        <Input label="Phone" value={s.phone} onChange={e=>setS(p=>({...p,phone:e.target.value}))} half />
-        <Textarea label="Address" value={s.address} onChange={e=>setS(p=>({...p,address:e.target.value}))} />
-        <Input label="Jurisdiction" value={s.jurisdiction} onChange={e=>setS(p=>({...p,jurisdiction:e.target.value}))} />
-
-        <div style={{marginTop:8}}>
+      <h2 style={{ margin: "0 0 20px", fontSize: 22, fontWeight: 700, color: "#1a1a2e" }}>Settings</h2>
+      <Card style={{ maxWidth: 600 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Company Information</div>
+        <Input label="Company Name" value={s.companyName} onChange={e => setS(p => ({ ...p, companyName: e.target.value }))} />
+        <Input label="Tagline" value={s.tagline} onChange={e => setS(p => ({ ...p, tagline: e.target.value }))} />
+        <Input label="GSTIN" value={s.gstin} onChange={e => setS(p => ({ ...p, gstin: e.target.value }))} half />
+        <Input label="Phone" value={s.phone} onChange={e => setS(p => ({ ...p, phone: e.target.value }))} half />
+        <Textarea label="Address" value={s.address} onChange={e => setS(p => ({ ...p, address: e.target.value }))} />
+        <Input label="Jurisdiction" value={s.jurisdiction} onChange={e => setS(p => ({ ...p, jurisdiction: e.target.value }))} />
+        <div style={{ marginTop: 8 }}>
           <Btn onClick={save}>Save Settings</Btn>
         </div>
-
-        <div style={{
-          marginTop:20,
-          display:"flex",
-          gap:10,
-          flexWrap:"wrap"
-        }}>
+        <div style={{ marginTop: 20, display: "flex", gap: 10, flexWrap: "wrap" }}>
           <Btn onClick={exportBackup}>Export Backup</Btn>
-
-          <label style={{cursor:"pointer"}}>
-            <input
-              type="file"
-              accept=".json"
-              onChange={importBackup}
-              style={{display:"none"}}
-            />
-
-            <span style={{
-              display:"inline-block",
-              padding:"10px 20px",
-              background:"#1565c0",
-              color:"#fff",
-              borderRadius:8,
-              fontWeight:600
-            }}>
-              Import Backup
-            </span>
+          <label style={{ cursor: "pointer" }}>
+            <input type="file" accept=".json" onChange={importBackup} style={{ display: "none" }} />
+            <span style={{ display: "inline-block", padding: "10px 20px", background: "#1565c0", color: "#fff", borderRadius: 8, fontWeight: 600 }}>Import Backup</span>
           </label>
-          
         </div>
       </Card>
     </div>
   );
 }
 
+// ============================================================
+// TRANSPORTERS PAGE
+// ============================================================
 function TransportersPage({ data, update }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const blank = { name:"",mobile:"",address:"",trucks:"",notes:"" };
+  const blank = { name: "", mobile: "", address: "", trucks: "", notes: "" };
   const [f, setF] = useState(blank);
 
   const save = () => {
     if (!f.name) return alert("Name required");
     const list = [...data.transporters];
     if (editing) {
-      const idx = list.findIndex(t=>t.id===editing.id);
+      const idx = list.findIndex(t => t.id === editing.id);
       list[idx] = { ...editing, ...f };
     } else {
       list.push({ ...f, id: genId() });
@@ -3167,49 +2470,49 @@ function TransportersPage({ data, update }) {
 
   const del = (id) => {
     if (!confirm("Delete?")) return;
-    update("transporters", data.transporters.filter(t=>t.id!==id));
+    update("transporters", data.transporters.filter(t => t.id !== id));
   };
 
   return (
     <div>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
-        <h2 style={{margin:0,fontSize:22,fontWeight:700,color:"#1a1a2e"}}>Transporters / Market Trucks</h2>
-        <Btn onClick={()=>{setF(blank);setEditing(null);setShowForm(true)}}>+ Add Transporter</Btn>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1a1a2e" }}>Transporters / Market Trucks</h2>
+        <Btn onClick={() => { setF(blank); setEditing(null); setShowForm(true) }}>+ Add Transporter</Btn>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
-        {data.transporters.length===0&&<EmptyState text="No transporters added" />}
-        {data.transporters.map(t=>{
-          const trips = data.trips.filter(r=>r.transporterName===t.name||r.ownerType==="market"&&r.truckNumber===t.trucks);
-          const commission = trips.filter(r=>r.ownerType==="market").reduce((s,r)=>s+(Number(r.commission)||0),0);
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 16 }}>
+        {data.transporters.length === 0 && <EmptyState text="No transporters added" />}
+        {data.transporters.map(t => {
+          const trips = data.trips.filter(r => r.transporterName === t.name || (r.ownerType === "market" && r.truckNumber === t.trucks));
+          const commission = trips.filter(r => r.ownerType === "market").reduce((s, r) => s + (Number(r.commission) || 0), 0);
           return (
             <Card key={t.id}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
                 <div>
-                  <div style={{fontWeight:700,fontSize:16}}>{t.name}</div>
-                  <div style={{color:"#888",fontSize:13}}>{t.mobile}</div>
-                  {t.trucks&&<div style={{fontSize:13}}>Trucks: {t.trucks}</div>}
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>{t.name}</div>
+                  <div style={{ color: "#888", fontSize: 13 }}>{t.mobile}</div>
+                  {t.trucks && <div style={{ fontSize: 13 }}>Trucks: {t.trucks}</div>}
                 </div>
-                <div style={{display:"flex",gap:6}}>
-                  <Btn small outline onClick={()=>{setEditing(t);setF(t);setShowForm(true)}}>Edit</Btn>
-                  <Btn small danger onClick={()=>del(t.id)}>Del</Btn>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <Btn small outline onClick={() => { setEditing(t); setF(t); setShowForm(true) }}>Edit</Btn>
+                  <Btn small danger onClick={() => del(t.id)}>Del</Btn>
                 </div>
               </div>
-              <div style={{fontSize:13,color:"#555"}}>
+              <div style={{ fontSize: 13, color: "#555" }}>
                 <div>Market trips: {trips.length}</div>
-                <div>Total commission: <span style={{fontWeight:700,color:"#2e7d32"}}>{fmt(commission)}</span></div>
+                <div>Total commission: <span style={{ fontWeight: 700, color: "#2e7d32" }}>{fmt(commission)}</span></div>
               </div>
             </Card>
           );
         })}
       </div>
-      <Modal open={showForm} onClose={()=>{setShowForm(false);setEditing(null)}} title={editing?"Edit Transporter":"New Transporter"}>
-        <Input label="Name" value={f.name} onChange={e=>setF(p=>({...p,name:e.target.value}))} />
-        <Input label="Mobile" value={f.mobile} onChange={e=>setF(p=>({...p,mobile:e.target.value}))} half />
-        <Input label="Truck Numbers" value={f.trucks} onChange={e=>setF(p=>({...p,trucks:e.target.value}))} half />
-        <Textarea label="Address" value={f.address} onChange={e=>setF(p=>({...p,address:e.target.value}))} />
-        <Textarea label="Notes" value={f.notes} onChange={e=>setF(p=>({...p,notes:e.target.value}))} />
-        <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:8}}>
-          <Btn outline onClick={()=>setShowForm(false)}>Cancel</Btn>
+      <Modal open={showForm} onClose={() => { setShowForm(false); setEditing(null) }} title={editing ? "Edit Transporter" : "New Transporter"}>
+        <Input label="Name" value={f.name} onChange={e => setF(p => ({ ...p, name: e.target.value }))} />
+        <Input label="Mobile" value={f.mobile} onChange={e => setF(p => ({ ...p, mobile: e.target.value }))} half />
+        <Input label="Truck Numbers" value={f.trucks} onChange={e => setF(p => ({ ...p, trucks: e.target.value }))} half />
+        <Textarea label="Address" value={f.address} onChange={e => setF(p => ({ ...p, address: e.target.value }))} />
+        <Textarea label="Notes" value={f.notes} onChange={e => setF(p => ({ ...p, notes: e.target.value }))} />
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+          <Btn outline onClick={() => setShowForm(false)}>Cancel</Btn>
           <Btn onClick={save}>Save</Btn>
         </div>
       </Modal>
@@ -3218,7 +2521,7 @@ function TransportersPage({ data, update }) {
 }
 
 // ============================================================
-// GENERAL EXPENSES PAGE - Add this before NAV
+// GENERAL EXPENSES PAGE
 // ============================================================
 function GeneralExpensesPage({ data, update }) {
   const [showForm, setShowForm] = useState(false);
@@ -3226,7 +2529,7 @@ function GeneralExpensesPage({ data, update }) {
   const [monthFilter, setMonthFilter] = useState(currentMonth);
   
   const blank = {
-    date: new Date().toISOString().slice(0,10),
+    date: new Date().toISOString().slice(0, 10),
     category: "",
     subCategory: "",
     description: "",
@@ -3250,11 +2553,10 @@ function GeneralExpensesPage({ data, update }) {
   };
 
   const filteredExpenses = (data.generalExpenses || [])
-    .filter(e => !monthFilter || e.date?.slice(0,7) === monthFilter)
-    .sort((a,b) => b.date?.localeCompare(a.date));
+    .filter(e => !monthFilter || e.date?.slice(0, 7) === monthFilter)
+    .sort((a, b) => b.date?.localeCompare(a.date));
 
-  const totalExpenses = filteredExpenses.reduce((s,e) => s + (Number(e.amount) || 0), 0);
-  
+  const totalExpenses = filteredExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const categoryTotals = {};
   filteredExpenses.forEach(e => {
     categoryTotals[e.category] = (categoryTotals[e.category] || 0) + (Number(e.amount) || 0);
@@ -3282,97 +2584,99 @@ function GeneralExpensesPage({ data, update }) {
 
   return (
     <div>
-      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20, flexWrap:"wrap", gap:12}}>
-        <h2 style={{margin:0, fontSize:22, fontWeight:700, color:"#1a1a2e"}}>General Expenses</h2>
-        <div style={{display:"flex", gap:10}}>
-          <select value={monthFilter} onChange={e=>setMonthFilter(e.target.value)} style={{...inp, width:140}}>
-            {monthOptions().map(o=><option key={o.val} value={o.val}>{o.label}</option>)}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1a1a2e" }}>General Expenses</h2>
+        <div style={{ display: "flex", gap: 10 }}>
+          <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)} style={{ ...inp, width: 140 }}>
+            {monthOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
           </select>
-          <Btn onClick={()=>{setF(blank); setEditing(null); setShowForm(true)}}>+ Add Expense</Btn>
+          <Btn onClick={() => { setF(blank); setEditing(null); setShowForm(true) }}>+ Add Expense</Btn>
         </div>
       </div>
 
-      <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:20}}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
         <StatCard label={`Total Expenses (${getMonthLabel(monthFilter)})`} value={fmt(totalExpenses)} color="red" />
         <StatCard label="Total Entries" value={filteredExpenses.length} color="blue" />
         <StatCard label="Categories" value={Object.keys(categoryTotals).length} color="purple" />
         <StatCard label="Avg per Entry" value={fmt(totalExpenses / (filteredExpenses.length || 1))} color="orange" />
       </div>
 
-      <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(250px,1fr))", gap:12, marginBottom:20}}>
-        {Object.entries(categoryTotals).slice(0,6).map(([cat, amt]) => (
-          <Card key={cat} style={{padding:"10px"}}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-              <span style={{fontWeight:600, fontSize:13}}>{cat}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px,1fr))", gap: 12, marginBottom: 20 }}>
+        {Object.entries(categoryTotals).slice(0, 6).map(([cat, amt]) => (
+          <Card key={cat} style={{ padding: "10px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>{cat}</span>
               <Badge color="red">{fmt(amt)}</Badge>
             </div>
-            <div style={{fontSize:11, color:"#888", marginTop:4}}>{((amt/totalExpenses)*100).toFixed(1)}% of total</div>
+            <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>{((amt / totalExpenses) * 100).toFixed(1)}% of total</div>
           </Card>
         ))}
       </div>
 
-      <Card style={{overflowX:"auto"}}>
+      <Card style={{ overflowX: "auto" }}>
         {filteredExpenses.length === 0 ? <EmptyState text="No expenses recorded" /> : (
-          <table style={{width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:800}}>
-            <thead><tr style={{background:"#f8f8f8", borderBottom:"2px solid #eee"}}>
-              <th style={{padding:"10px 12px"}}>Date</th><th style={{padding:"10px 12px"}}>Category</th>
-              <th style={{padding:"10px 12px"}}>Description</th><th style={{padding:"10px 12px"}}>Vendor/Vehicle</th>
-              <th style={{padding:"10px 12px", textAlign:"right"}}>Amount</th><th style={{padding:"10px 12px"}}>Mode</th>
-              <th style={{padding:"10px 12px"}}>Actions</th>
-            </tr></thead>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 800 }}>
+            <thead>
+              <tr style={{ background: "#f8f8f8", borderBottom: "2px solid #eee" }}>
+                <th style={{ padding: "10px 12px" }}>Date</th><th style={{ padding: "10px 12px" }}>Category</th>
+                <th style={{ padding: "10px 12px" }}>Description</th><th style={{ padding: "10px 12px" }}>Vendor/Vehicle</th>
+                <th style={{ padding: "10px 12px", textAlign: "right" }}>Amount</th><th style={{ padding: "10px 12px" }}>Mode</th>
+                <th style={{ padding: "10px 12px" }}>Actions</th>
+              </tr>
+            </thead>
             <tbody>
               {filteredExpenses.map(e => (
-                <tr key={e.id} style={{borderBottom:"1px solid #f0f0f0"}}>
-                  <td style={{padding:"10px 12px"}}>{e.date}</td>
-                  <td style={{padding:"10px 12px"}}><div style={{fontWeight:600}}>{e.category}</div><div style={{fontSize:11, color:"#888"}}>{e.subCategory}</div></td>
-                  <td style={{padding:"10px 12px"}}>{e.description}</td>
-                  <td style={{padding:"10px 12px", fontSize:12}}>{e.vendorName || e.vehicleNumber || "-"}</td>
-                  <td style={{padding:"10px 12px", textAlign:"right", fontWeight:700, color:"#c62828"}}>{fmt(e.amount)}</td>
-                  <td style={{padding:"10px 12px", fontSize:12}}>{e.paymentMode}</td>
-                  <td style={{padding:"10px 12px"}}>
-                    <Btn small outline onClick={()=>{setEditing(e); setF(e); setShowForm(true)}}>Edit</Btn>
-                    <Btn small danger onClick={()=>deleteExpense(e.id)} style={{marginLeft:5}}>Del</Btn>
+                <tr key={e.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                  <td style={{ padding: "10px 12px" }}>{e.date}</td>
+                  <td style={{ padding: "10px 12px" }}><div style={{ fontWeight: 600 }}>{e.category}</div><div style={{ fontSize: 11, color: "#888" }}>{e.subCategory}</div></td>
+                  <td style={{ padding: "10px 12px" }}>{e.description}</td>
+                  <td style={{ padding: "10px 12px", fontSize: 12 }}>{e.vendorName || e.vehicleNumber || "-"}</td>
+                  <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: "#c62828" }}>{fmt(e.amount)}</td>
+                  <td style={{ padding: "10px 12px", fontSize: 12 }}>{e.paymentMode}</td>
+                  <td style={{ padding: "10px 12px" }}>
+                    <Btn small outline onClick={() => { setEditing(e); setF(e); setShowForm(true) }}>Edit</Btn>
+                    <Btn small danger onClick={() => deleteExpense(e.id)} style={{ marginLeft: 5 }}>Del</Btn>
                   </td>
-                 </tr>
+                </tr>
               ))}
             </tbody>
-            <tfoot><tr style={{background:"#ffebee", fontWeight:700}}>
-              <td colSpan="4" style={{padding:"10px 12px", textAlign:"right"}}>TOTAL:</td>
-              <td style={{padding:"10px 12px", textAlign:"right", color:"#c62828"}}>{fmt(totalExpenses)}</td>
-              <td colSpan="2"></td>
-            </tr></tfoot>
+            <tfoot>
+              <tr style={{ background: "#ffebee", fontWeight: 700 }}>
+                <td colSpan="4" style={{ padding: "10px 12px", textAlign: "right" }}>TOTAL:</td>
+                <td style={{ padding: "10px 12px", textAlign: "right", color: "#c62828" }}>{fmt(totalExpenses)}</td><td colSpan="2"></td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </Card>
 
-      <Modal open={showForm} onClose={()=>{setShowForm(false); setEditing(null)}} title={editing?"Edit Expense":"Add Expense"} wide>
-        <div style={{display:"flex", flexWrap:"wrap", gap:0}}>
-          <Input label="Date" type="date" value={f.date} onChange={e=>setF(p=>({...p, date:e.target.value}))} half />
-          <Select label="Category" value={f.category} onChange={e=>setF(p=>({...p, category:e.target.value, subCategory:""}))} half>
+      <Modal open={showForm} onClose={() => { setShowForm(false); setEditing(null) }} title={editing ? "Edit Expense" : "Add Expense"} wide>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
+          <Input label="Date" type="date" value={f.date} onChange={e => setF(p => ({ ...p, date: e.target.value }))} half />
+          <Select label="Category" value={f.category} onChange={e => setF(p => ({ ...p, category: e.target.value, subCategory: "" }))} half>
             <option value="">Select Category</option>
             {Object.keys(expenseCategories).map(cat => <option key={cat} value={cat}>{cat}</option>)}
           </Select>
           {f.category && (
-            <Select label="Sub Category" value={f.subCategory} onChange={e=>setF(p=>({...p, subCategory:e.target.value}))} half>
+            <Select label="Sub Category" value={f.subCategory} onChange={e => setF(p => ({ ...p, subCategory: e.target.value }))} half>
               <option value="">Select Sub Category</option>
               {expenseCategories[f.category].map(sub => <option key={sub} value={sub}>{sub}</option>)}
             </Select>
           )}
-          <Input label="Description" value={f.description} onChange={e=>setF(p=>({...p, description:e.target.value}))} half />
-          <Input label="Amount (₹)" type="number" value={f.amount} onChange={e=>setF(p=>({...p, amount:e.target.value}))} half />
-          <Select label="Payment Mode" value={f.paymentMode} onChange={e=>setF(p=>({...p, paymentMode:e.target.value}))} half>
+          <Input label="Description" value={f.description} onChange={e => setF(p => ({ ...p, description: e.target.value }))} half />
+          <Input label="Amount (₹)" type="number" value={f.amount} onChange={e => setF(p => ({ ...p, amount: e.target.value }))} half />
+          <Select label="Payment Mode" value={f.paymentMode} onChange={e => setF(p => ({ ...p, paymentMode: e.target.value }))} half>
             <option value="cash">Cash</option><option value="bank">Bank Transfer</option><option value="upi">UPI</option>
           </Select>
-          <Input label="Vendor Name" value={f.vendorName} onChange={e=>setF(p=>({...p, vendorName:e.target.value}))} half />
-          // In GeneralExpensesPage, add this inside the form where vehicle number is:
-          <Input label="Vehicle Number" value={f.vehicleNumber} onChange={e=>setF(p=>({...p, vehicleNumber:e.target.value}))} half list="truck-list" />
+          <Input label="Vendor Name" value={f.vendorName} onChange={e => setF(p => ({ ...p, vendorName: e.target.value }))} half />
+          <Input label="Vehicle Number" value={f.vehicleNumber} onChange={e => setF(p => ({ ...p, vehicleNumber: e.target.value }))} half list="truck-list" />
           <datalist id="truck-list">
             {data.trucks.map(t => <option key={t.id} value={t.number} />)}
           </datalist>
         </div>
-        <Textarea label="Remarks" value={f.remarks} onChange={e=>setF(p=>({...p, remarks:e.target.value}))} />
-        <div style={{display:"flex", gap:10, justifyContent:"flex-end", marginTop:8}}>
-          <Btn outline onClick={()=>setShowForm(false)}>Cancel</Btn>
+        <Textarea label="Remarks" value={f.remarks} onChange={e => setF(p => ({ ...p, remarks: e.target.value }))} />
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+          <Btn outline onClick={() => setShowForm(false)}>Cancel</Btn>
           <Btn onClick={saveExpense}>Save Expense</Btn>
         </div>
       </Modal>
@@ -3381,7 +2685,7 @@ function GeneralExpensesPage({ data, update }) {
 }
 
 // ============================================================
-// STAFF SALARIES PAGE - FIXED TABLE SYNTAX
+// STAFF SALARIES PAGE
 // ============================================================
 function StaffSalariesPage({ data, update }) {
   const [showForm, setShowForm] = useState(false);
@@ -3389,7 +2693,7 @@ function StaffSalariesPage({ data, update }) {
   const [monthFilter, setMonthFilter] = useState(currentMonth);
   
   const blank = {
-    date: new Date().toISOString().slice(0,10),
+    date: new Date().toISOString().slice(0, 10),
     staffName: "",
     role: "",
     salaryMonth: currentMonth,
@@ -3402,7 +2706,6 @@ function StaffSalariesPage({ data, update }) {
   };
   const [f, setF] = useState(blank);
 
-  // Auto-calculate net amount
   useEffect(() => {
     setF(prev => ({
       ...prev,
@@ -3414,7 +2717,7 @@ function StaffSalariesPage({ data, update }) {
 
   const filteredSalaries = (data.staffSalaries || [])
     .filter(s => !monthFilter || s.salaryMonth === monthFilter)
-    .sort((a,b) => b.date?.localeCompare(a.date));
+    .sort((a, b) => b.date?.localeCompare(a.date));
 
   const totalSalary = filteredSalaries.reduce((s, sal) => s + (Number(sal.netAmount) || 0), 0);
   const totalBonus = filteredSalaries.reduce((s, sal) => s + (Number(sal.bonus) || 0), 0);
@@ -3442,101 +2745,93 @@ function StaffSalariesPage({ data, update }) {
 
   return (
     <div>
-      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20, flexWrap:"wrap", gap:12}}>
-        <h2 style={{margin:0, fontSize:22, fontWeight:700, color:"#1a1a2e"}}>Staff Salaries</h2>
-        <div style={{display:"flex", gap:10}}>
-          <select value={monthFilter} onChange={e=>setMonthFilter(e.target.value)} style={{...inp, width:160}}>
-            {monthOptions().map(o=><option key={o.val} value={o.val}>{o.label}</option>)}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1a1a2e" }}>Staff Salaries</h2>
+        <div style={{ display: "flex", gap: 10 }}>
+          <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)} style={{ ...inp, width: 160 }}>
+            {monthOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
           </select>
-          <Btn onClick={()=>{setF(blank); setEditing(null); setShowForm(true)}}>+ Add Salary</Btn>
+          <Btn onClick={() => { setF(blank); setEditing(null); setShowForm(true) }}>+ Add Salary</Btn>
         </div>
       </div>
 
-      <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:20}}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 20 }}>
         <StatCard label={`Total Salary (${getMonthLabel(monthFilter)})`} value={fmt(totalSalary)} color="orange" />
         <StatCard label="Bonus Given" value={fmt(totalBonus)} color="green" />
         <StatCard label="Deductions" value={fmt(totalDeductions)} color="red" />
         <StatCard label="Staff Count" value={filteredSalaries.length} color="blue" />
       </div>
 
-      <Card style={{overflowX:"auto"}}>
+      <Card style={{ overflowX: "auto" }}>
         {filteredSalaries.length === 0 ? <EmptyState text="No salary records" /> : (
-          <table style={{width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:800}}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 800 }}>
             <thead>
-              <tr style={{background:"#f8f8f8", borderBottom:"2px solid #eee"}}>
-                <th style={{padding:"10px 12px"}}>Date</th>
-                <th style={{padding:"10px 12px"}}>Staff Name</th>
-                <th style={{padding:"10px 12px"}}>Role</th>
-                <th style={{padding:"10px 12px", textAlign:"right"}}>Basic</th>
-                <th style={{padding:"10px 12px", textAlign:"right"}}>Bonus</th>
-                <th style={{padding:"10px 12px", textAlign:"right"}}>Deductions</th>
-                <th style={{padding:"10px 12px", textAlign:"right"}}>Net</th>
-                <th style={{padding:"10px 12px"}}>Mode</th>
-                <th style={{padding:"10px 12px"}}>Actions</th>
+              <tr style={{ background: "#f8f8f8", borderBottom: "2px solid #eee" }}>
+                <th style={{ padding: "10px 12px" }}>Date</th><th style={{ padding: "10px 12px" }}>Staff Name</th>
+                <th style={{ padding: "10px 12px" }}>Role</th><th style={{ padding: "10px 12px", textAlign: "right" }}>Basic</th>
+                <th style={{ padding: "10px 12px", textAlign: "right" }}>Bonus</th><th style={{ padding: "10px 12px", textAlign: "right" }}>Deductions</th>
+                <th style={{ padding: "10px 12px", textAlign: "right" }}>Net</th><th style={{ padding: "10px 12px" }}>Mode</th>
+                <th style={{ padding: "10px 12px" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredSalaries.map(s => (
-                <tr key={s.id} style={{borderBottom:"1px solid #f0f0f0"}}>
-                  <td style={{padding:"10px 12px"}}>{s.date}</td>
-                  <td style={{padding:"10px 12px", fontWeight:600}}>{s.staffName}</td>
-                  <td style={{padding:"10px 12px"}}>{s.role}</td>
-                  <td style={{padding:"10px 12px", textAlign:"right"}}>{fmt(s.basicSalary)}</td>
-                  <td style={{padding:"10px 12px", textAlign:"right", color:"#2e7d32"}}>{fmt(s.bonus)}</td>
-                  <td style={{padding:"10px 12px", textAlign:"right", color:"#c62828"}}>{fmt(s.deductions)}</td>
-                  <td style={{padding:"10px 12px", textAlign:"right", fontWeight:700}}>{fmt(s.netAmount)}</td>
-                  <td style={{padding:"10px 12px"}}>{s.paymentMode}</td>
-                  <td style={{padding:"10px 12px"}}>
-                    <Btn small outline onClick={()=>{setEditing(s); setF(s); setShowForm(true)}}>Edit</Btn>
+                <tr key={s.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                  <td style={{ padding: "10px 12px" }}>{s.date}</td>
+                  <td style={{ padding: "10px 12px", fontWeight: 600 }}>{s.staffName}</td>
+                  <td style={{ padding: "10px 12px" }}>{s.role}</td>
+                  <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmt(s.basicSalary)}</td>
+                  <td style={{ padding: "10px 12px", textAlign: "right", color: "#2e7d32" }}>{fmt(s.bonus)}</td>
+                  <td style={{ padding: "10px 12px", textAlign: "right", color: "#c62828" }}>{fmt(s.deductions)}</td>
+                  <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700 }}>{fmt(s.netAmount)}</td>
+                  <td style={{ padding: "10px 12px" }}>{s.paymentMode}</td>
+                  <td style={{ padding: "10px 12px" }}>
+                    <Btn small outline onClick={() => { setEditing(s); setF(s); setShowForm(true) }}>Edit</Btn>
                     {" "}
-                    <Btn small danger onClick={()=>deleteSalary(s.id)}>Del</Btn>
+                    <Btn small danger onClick={() => deleteSalary(s.id)}>Del</Btn>
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr style={{background:"#fff3e0", fontWeight:700}}>
-                <td colSpan="3" style={{padding:"10px 12px", textAlign:"right"}}>TOTAL:</td>
-                <td style={{padding:"10px 12px", textAlign:"right"}}>{fmt(filteredSalaries.reduce((s, sal) => s + (Number(sal.basicSalary)||0), 0))}</td>
-                <td style={{padding:"10px 12px", textAlign:"right"}}>{fmt(totalBonus)}</td>
-                <td style={{padding:"10px 12px", textAlign:"right"}}>{fmt(totalDeductions)}</td>
-                <td style={{padding:"10px 12px", textAlign:"right", color:"#e65100"}}>{fmt(totalSalary)}</td>
-                <td colSpan="2"></td>
+              <tr style={{ background: "#fff3e0", fontWeight: 700 }}>
+                <td colSpan="3" style={{ padding: "10px 12px", textAlign: "right" }}>TOTAL:</td>
+                <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmt(filteredSalaries.reduce((s, sal) => s + (Number(sal.basicSalary) || 0), 0))}</td>
+                <td style={{ padding: "10px 12px", textAlign: "right" }}>{fmt(totalBonus)}</td><td style={{ padding: "10px 12px", textAlign: "right" }}>{fmt(totalDeductions)}</td>
+                <td style={{ padding: "10px 12px", textAlign: "right", color: "#e65100" }}>{fmt(totalSalary)}</td><td colSpan="2"></td>
               </tr>
             </tfoot>
           </table>
         )}
       </Card>
 
-      <Modal open={showForm} onClose={()=>{setShowForm(false); setEditing(null)}} title={editing?"Edit Salary":"Add Salary"} wide>
-        <div style={{display:"flex", flexWrap:"wrap", gap:0}}>
-          <Input label="Date" type="date" value={f.date} onChange={e=>setF(p=>({...p, date:e.target.value}))} half />
-          <Input label="Staff Name" value={f.staffName} onChange={e=>setF(p=>({...p, staffName:e.target.value}))} half />
-          <Select label="Role" value={f.role} onChange={e=>setF(p=>({...p, role:e.target.value}))} half>
+      <Modal open={showForm} onClose={() => { setShowForm(false); setEditing(null) }} title={editing ? "Edit Salary" : "Add Salary"} wide>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
+          <Input label="Date" type="date" value={f.date} onChange={e => setF(p => ({ ...p, date: e.target.value }))} half />
+          <Input label="Staff Name" value={f.staffName} onChange={e => setF(p => ({ ...p, staffName: e.target.value }))} half />
+          <Select label="Role" value={f.role} onChange={e => setF(p => ({ ...p, role: e.target.value }))} half>
             <option value="">Select Role</option>
             {staffRoles.map(r => <option key={r} value={r}>{r}</option>)}
           </Select>
-          <Select label="Salary Month" value={f.salaryMonth} onChange={e=>setF(p=>({...p, salaryMonth:e.target.value}))} half>
-            {monthOptions().map(o=><option key={o.val} value={o.val}>{o.label}</option>)}
+          <Select label="Salary Month" value={f.salaryMonth} onChange={e => setF(p => ({ ...p, salaryMonth: e.target.value }))} half>
+            {monthOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
           </Select>
         </div>
-        <div style={{display:"flex", flexWrap:"wrap", gap:0}}>
-          <Input label="Basic Salary (₹)" type="number" value={f.basicSalary} onChange={e=>setF(p=>({...p, basicSalary:e.target.value}))} half />
-          <Input label="Bonus (₹)" type="number" value={f.bonus} onChange={e=>setF(p=>({...p, bonus:e.target.value}))} half />
-          <Input label="Deductions (₹)" type="number" value={f.deductions} onChange={e=>setF(p=>({...p, deductions:e.target.value}))} half />
-          <Select label="Payment Mode" value={f.paymentMode} onChange={e=>setF(p=>({...p, paymentMode:e.target.value}))} half>
-            <option value="cash">Cash</option>
-            <option value="bank">Bank Transfer</option>
-            <option value="upi">UPI</option>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
+          <Input label="Basic Salary (₹)" type="number" value={f.basicSalary} onChange={e => setF(p => ({ ...p, basicSalary: e.target.value }))} half />
+          <Input label="Bonus (₹)" type="number" value={f.bonus} onChange={e => setF(p => ({ ...p, bonus: e.target.value }))} half />
+          <Input label="Deductions (₹)" type="number" value={f.deductions} onChange={e => setF(p => ({ ...p, deductions: e.target.value }))} half />
+          <Select label="Payment Mode" value={f.paymentMode} onChange={e => setF(p => ({ ...p, paymentMode: e.target.value }))} half>
+            <option value="cash">Cash</option><option value="bank">Bank Transfer</option><option value="upi">UPI</option>
           </Select>
         </div>
-        <div style={{background:"#e8f5e9", borderRadius:8, padding:"10px 14px", marginBottom:14}}>
-          <div style={{fontSize:12, color:"#2e7d32", fontWeight:600}}>NET PAYABLE</div>
-          <div style={{fontSize:18, fontWeight:700, color:"#2e7d32"}}>{fmt(f.netAmount)}</div>
+        <div style={{ background: "#e8f5e9", borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: "#2e7d32", fontWeight: 600 }}>NET PAYABLE</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#2e7d32" }}>{fmt(f.netAmount)}</div>
         </div>
-        <Textarea label="Remarks" value={f.remarks} onChange={e=>setF(p=>({...p, remarks:e.target.value}))} />
-        <div style={{display:"flex", gap:10, justifyContent:"flex-end", marginTop:8}}>
-          <Btn outline onClick={()=>setShowForm(false)}>Cancel</Btn>
+        <Textarea label="Remarks" value={f.remarks} onChange={e => setF(p => ({ ...p, remarks: e.target.value }))} />
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+          <Btn outline onClick={() => setShowForm(false)}>Cancel</Btn>
           <Btn onClick={saveSalary}>Save Salary</Btn>
         </div>
       </Modal>
@@ -3545,7 +2840,7 @@ function StaffSalariesPage({ data, update }) {
 }
 
 // ============================================================
-// OWNER DRAWINGS PAGE - Add this before NAV
+// OWNER DRAWINGS PAGE
 // ============================================================
 function OwnerDrawingsPage({ data, update }) {
   const [showForm, setShowForm] = useState(false);
@@ -3553,7 +2848,7 @@ function OwnerDrawingsPage({ data, update }) {
   const [monthFilter, setMonthFilter] = useState(currentMonth);
   
   const blank = {
-    date: new Date().toISOString().slice(0,10),
+    date: new Date().toISOString().slice(0, 10),
     type: "drawing",
     category: "",
     description: "",
@@ -3569,8 +2864,8 @@ function OwnerDrawingsPage({ data, update }) {
   const getCategories = () => f.type === "drawing" ? drawingCategories : investmentCategories;
 
   const filteredDrawings = (data.ownerDrawings || [])
-    .filter(d => !monthFilter || d.date?.slice(0,7) === monthFilter)
-    .sort((a,b) => b.date?.localeCompare(a.date));
+    .filter(d => !monthFilter || d.date?.slice(0, 7) === monthFilter)
+    .sort((a, b) => b.date?.localeCompare(a.date));
 
   const totalDrawings = filteredDrawings.reduce((s, d) => s + (Number(d.amount) || 0), 0);
   const totalWithdrawals = filteredDrawings.filter(d => d.type === "drawing").reduce((s, d) => s + (Number(d.amount) || 0), 0);
@@ -3598,308 +2893,111 @@ function OwnerDrawingsPage({ data, update }) {
 
   return (
     <div>
-      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20, flexWrap:"wrap", gap:12}}>
-        <h2 style={{margin:0, fontSize:22, fontWeight:700, color:"#1a1a2e"}}>Owner's Drawings</h2>
-        <div style={{display:"flex", gap:10}}>
-          <select value={monthFilter} onChange={e=>setMonthFilter(e.target.value)} style={{...inp, width:160}}>
-            {monthOptions().map(o=><option key={o.val} value={o.val}>{o.label}</option>)}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1a1a2e" }}>Owner's Drawings</h2>
+        <div style={{ display: "flex", gap: 10 }}>
+          <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)} style={{ ...inp, width: 160 }}>
+            {monthOptions().map(o => <option key={o.val} value={o.val}>{o.label}</option>)}
           </select>
-          <Btn onClick={()=>{setF(blank); setEditing(null); setShowForm(true)}}>+ Add Entry</Btn>
+          <Btn onClick={() => { setF(blank); setEditing(null); setShowForm(true) }}>+ Add Entry</Btn>
         </div>
       </div>
 
-      <div style={{display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:20}}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 20 }}>
         <StatCard label={`Total Drawings (${getMonthLabel(monthFilter)})`} value={fmt(totalDrawings)} color="orange" />
         <StatCard label="Personal Withdrawals" value={fmt(totalWithdrawals)} color="red" />
         <StatCard label="Business Investments" value={fmt(totalInvestments)} color="green" />
       </div>
 
-      <Card style={{overflowX:"auto"}}>
+      <Card style={{ overflowX: "auto" }}>
         {filteredDrawings.length === 0 ? <EmptyState text="No owner entries" /> : (
-          <table style={{width:"100%", borderCollapse:"collapse", fontSize:13, minWidth:600}}>
-            <thead><tr style={{background:"#f8f8f8", borderBottom:"2px solid #eee"}}>
-              <th>Date</th><th>Type</th><th>Category</th><th>Description</th><th style={{textAlign:"right"}}>Amount</th><th>Mode</th><th>Actions</th>
-             </tr></thead>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 600 }}>
+            <thead>
+              <tr style={{ background: "#f8f8f8", borderBottom: "2px solid #eee" }}>
+                <th>Date</th><th>Type</th><th>Category</th><th>Description</th><th style={{ textAlign: "right" }}>Amount</th><th>Mode</th><th>Actions</th>
+              </tr>
+            </thead>
             <tbody>
               {filteredDrawings.map(d => (
-                <tr key={d.id} style={{borderBottom:"1px solid #f0f0f0"}}>
-                  <td style={{padding:"10px 12px"}}>{d.date}</td>
+                <tr key={d.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                  <td style={{ padding: "10px 12px" }}>{d.date}</td>
                   <td><Badge color={d.type === "drawing" ? "orange" : "green"}>{d.type === "drawing" ? "Withdrawal" : "Investment"}</Badge></td>
                   <td>{d.category}</td><td>{d.description}</td>
-                  <td style={{textAlign:"right", fontWeight:700, color:"#e65100"}}>{fmt(d.amount)}</td>
+                  <td style={{ textAlign: "right", fontWeight: 700, color: "#e65100" }}>{fmt(d.amount)}</td>
                   <td>{d.paymentMode}</td>
-                  <td><Btn small outline onClick={()=>{setEditing(d); setF(d); setShowForm(true)}}>Edit</Btn>
-                  <Btn small danger onClick={()=>deleteDrawing(d.id)} style={{marginLeft:5}}>Del</Btn></td>
+                  <td>
+                    <Btn small outline onClick={() => { setEditing(d); setF(d); setShowForm(true) }}>Edit</Btn>
+                    <Btn small danger onClick={() => deleteDrawing(d.id)} style={{ marginLeft: 5 }}>Del</Btn>
+                  </td>
                 </tr>
               ))}
             </tbody>
-            <tfoot><tr style={{background:"#fff3e0", fontWeight:700}}>
-              <td colSpan="4" style={{textAlign:"right"}}>TOTAL:</td>
-              <td style={{textAlign:"right", color:"#e65100"}}>{fmt(totalDrawings)}</td><td colSpan="2"></td>
-            </tr></tfoot>
+            <tfoot>
+              <tr style={{ background: "#fff3e0", fontWeight: 700 }}>
+                <td colSpan="4" style={{ textAlign: "right" }}>TOTAL:</td>
+                <td style={{ textAlign: "right", color: "#e65100" }}>{fmt(totalDrawings)}</td><td colSpan="2"></td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </Card>
 
-      <Modal open={showForm} onClose={()=>{setShowForm(false); setEditing(null)}} title={editing?"Edit Entry":"Add Owner Entry"}>
-        <Input label="Date" type="date" value={f.date} onChange={e=>setF(p=>({...p, date:e.target.value}))} half />
-        <Select label="Type" value={f.type} onChange={e=>setF(p=>({...p, type:e.target.value, category:""}))} half>
+      <Modal open={showForm} onClose={() => { setShowForm(false); setEditing(null) }} title={editing ? "Edit Entry" : "Add Owner Entry"}>
+        <Input label="Date" type="date" value={f.date} onChange={e => setF(p => ({ ...p, date: e.target.value }))} half />
+        <Select label="Type" value={f.type} onChange={e => setF(p => ({ ...p, type: e.target.value, category: "" }))} half>
           <option value="drawing">Personal Withdrawal</option>
           <option value="investment">Business Investment</option>
         </Select>
-        <Select label="Category" value={f.category} onChange={e=>setF(p=>({...p, category:e.target.value}))} half>
+        <Select label="Category" value={f.category} onChange={e => setF(p => ({ ...p, category: e.target.value }))} half>
           <option value="">Select Category</option>
           {getCategories().map(c => <option key={c} value={c}>{c}</option>)}
         </Select>
-        <Input label="Description" value={f.description} onChange={e=>setF(p=>({...p, description:e.target.value}))} half />
-        <Input label="Amount (₹)" type="number" value={f.amount} onChange={e=>setF(p=>({...p, amount:e.target.value}))} half />
-        <Select label="Payment Mode" value={f.paymentMode} onChange={e=>setF(p=>({...p, paymentMode:e.target.value}))} half>
+        <Input label="Description" value={f.description} onChange={e => setF(p => ({ ...p, description: e.target.value }))} half />
+        <Input label="Amount (₹)" type="number" value={f.amount} onChange={e => setF(p => ({ ...p, amount: e.target.value }))} half />
+        <Select label="Payment Mode" value={f.paymentMode} onChange={e => setF(p => ({ ...p, paymentMode: e.target.value }))} half>
           <option value="cash">Cash</option><option value="bank">Bank Transfer</option><option value="upi">UPI</option>
         </Select>
-        <Textarea label="Remarks" value={f.remarks} onChange={e=>setF(p=>({...p, remarks:e.target.value}))} />
-        <div style={{display:"flex", gap:10, justifyContent:"flex-end", marginTop:8}}>
-          <Btn outline onClick={()=>setShowForm(false)}>Cancel</Btn>
+        <Textarea label="Remarks" value={f.remarks} onChange={e => setF(p => ({ ...p, remarks: e.target.value }))} />
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+          <Btn outline onClick={() => setShowForm(false)}>Cancel</Btn>
           <Btn onClick={saveDrawing}>Save Entry</Btn>
         </div>
       </Modal>
     </div>
   );
 }
+
 // ============================================================
-// ENHANCED PROFIT & LOSS REPORT - Add this before NAV
+// NAVIGATION MENU
 // ============================================================
-function ProfitLossReport({ data, month }) {
-  // Get trip data for selected month
-  const trips = data.trips.filter(t => tripMonth(t) === month);
-  
-  // 1. TRIP INCOME & EXPENSES
-  const tripIncome = trips.reduce((s, t) => s + (Number(t.freight) || 0), 0);
-  
-  const tripExpenses = {
-    diesel: trips.reduce((s, t) => s + (Number(t.diesel) || 0), 0),
-    cng: trips.reduce((s, t) => s + (Number(t.cng) || 0), 0),
-    toll: trips.reduce((s, t) => s + (Number(t.toll) || 0), 0),
-    driverAdvance: trips.reduce((s, t) => s + (Number(t.driverAdvance) || 0), 0),
-    otherExpense: trips.reduce((s, t) => s + (Number(t.otherExpense) || 0), 0),
-    marketPayable: trips.filter(t => t.ownerType === "market").reduce((s, t) => s + (Number(t.amountPayable) || 0), 0),
-  };
-  const totalTripExpenses = Object.values(tripExpenses).reduce((a, b) => a + b, 0);
-  const tripProfit = tripIncome - totalTripExpenses;
-
-  // 2. GENERAL EXPENSES (Rent, Maintenance, Challans, Office, etc.)
-  const generalExpenses = (data.generalExpenses || []).filter(e => e.date?.slice(0,7) === month);
-  const generalExpensesByCategory = {};
-  generalExpenses.forEach(e => {
-    generalExpensesByCategory[e.category] = (generalExpensesByCategory[e.category] || 0) + (Number(e.amount) || 0);
-  });
-  const totalGeneralExpenses = generalExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-
-  // 3. STAFF SALARIES (excluding drivers - drivers handled in trip expenses)
-  const staffSalaries = (data.staffSalaries || []).filter(s => s.salaryMonth === month);
-  const totalStaffSalaries = staffSalaries.reduce((s, sal) => s + (Number(sal.netAmount) || 0), 0);
-  const staffSalaryBreakdown = {};
-  staffSalaries.forEach(s => {
-    staffSalaryBreakdown[s.role] = (staffSalaryBreakdown[s.role] || 0) + (Number(s.netAmount) || 0);
-  });
-
-  // 4. OWNER DRAWINGS (not an expense but tracked for cash flow)
-  const ownerDrawings = (data.ownerDrawings || []).filter(d => d.date?.slice(0,7) === month);
-  const totalWithdrawals = ownerDrawings.filter(d => d.type === "drawing").reduce((s, d) => s + (Number(d.amount) || 0), 0);
-  const totalInvestments = ownerDrawings.filter(d => d.type === "investment").reduce((s, d) => s + (Number(d.amount) || 0), 0);
-  const totalOwnerDrawings = totalWithdrawals + totalInvestments;
-
-  // 5. TOTAL BUSINESS EXPENSES (excluding owner personal expenses)
-  const totalBusinessExpenses = totalTripExpenses + totalGeneralExpenses + totalStaffSalaries;
-  const netBusinessProfit = tripIncome - totalBusinessExpenses;
-  
-  // 6. Cash flow summary
-  const cashIn = (data.cashbook || []).filter(c => c.date?.slice(0,7) === month && c.type === "in").reduce((s, c) => s + (Number(c.amount) || 0), 0);
-  const cashOut = (data.cashbook || []).filter(c => c.date?.slice(0,7) === month && c.type === "out").reduce((s, c) => s + (Number(c.amount) || 0), 0);
-
-  return (
-    <div>
-      {/* Summary Cards */}
-      <div style={{display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:14, marginBottom:20}}>
-        <StatCard label="Total Freight Income" value={fmt(tripIncome)} color="green" />
-        <StatCard label="Total Business Expenses" value={fmt(totalBusinessExpenses)} color="red" />
-        <StatCard label="Net Business Profit" value={fmt(netBusinessProfit)} color={netBusinessProfit >= 0 ? "teal" : "red"} />
-        <StatCard label="Profit Margin" value={`${((netBusinessProfit / tripIncome) * 100).toFixed(1)}%`} color="blue" />
-      </div>
-
-      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:16}}>
-        {/* LEFT COLUMN - INCOME & TRIP EXPENSES */}
-        <div>
-          {/* Income Section */}
-          <Card style={{marginBottom:16}}>
-            <div style={{fontWeight:700, fontSize:16, marginBottom:12, borderBottom:"2px solid #1a1a2e", paddingBottom:8}}>
-              📈 INCOME
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid #eee"}}>
-              <span>Freight Income from Trips</span>
-              <span style={{fontWeight:700, color:"#2e7d32"}}>{fmt(tripIncome)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", background:"#e8f5e9", marginTop:8, fontWeight:700}}>
-              <span>TOTAL INCOME</span>
-              <span style={{color:"#2e7d32"}}>{fmt(tripIncome)}</span>
-            </div>
-          </Card>
-
-          {/* Trip Expenses Section */}
-          <Card style={{marginBottom:16}}>
-            <div style={{fontWeight:700, fontSize:16, marginBottom:12, borderBottom:"2px solid #e65100", paddingBottom:8}}>
-              🚛 TRIP EXPENSES
-            </div>
-            {Object.entries(tripExpenses).map(([key, amount]) => amount > 0 && (
-              <div key={key} style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f0f0f0"}}>
-                <span style={{color:"#666"}}>{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</span>
-                <span>{fmt(amount)}</span>
-              </div>
-            ))}
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", marginTop:8, background:"#fff3e0", fontWeight:700}}>
-              <span>Total Trip Expenses</span>
-              <span style={{color:"#e65100"}}>{fmt(totalTripExpenses)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", background:"#e8f5e9", fontWeight:700}}>
-              <span>Gross Profit from Trips</span>
-              <span style={{color:"#2e7d32"}}>{fmt(tripProfit)}</span>
-            </div>
-          </Card>
-
-          {/* General Expenses Section */}
-          <Card>
-            <div style={{fontWeight:700, fontSize:16, marginBottom:12, borderBottom:"2px solid #c62828", paddingBottom:8}}>
-              🏢 GENERAL EXPENSES
-            </div>
-            {Object.entries(generalExpensesByCategory).map(([cat, amt]) => (
-              <div key={cat} style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f0f0f0"}}>
-                <span style={{color:"#666"}}>{cat}</span>
-                <span>{fmt(amt)}</span>
-              </div>
-            ))}
-            {Object.keys(generalExpensesByCategory).length === 0 && (
-              <div style={{color:"#888", textAlign:"center", padding:"16px"}}>No general expenses recorded</div>
-            )}
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", marginTop:8, background:"#ffebee", fontWeight:700}}>
-              <span>Total General Expenses</span>
-              <span style={{color:"#c62828"}}>{fmt(totalGeneralExpenses)}</span>
-            </div>
-          </Card>
-        </div>
-
-        {/* RIGHT COLUMN - SALARIES, OWNER & SUMMARY */}
-        <div>
-          {/* Staff Salaries Section */}
-          <Card style={{marginBottom:16}}>
-            <div style={{fontWeight:700, fontSize:16, marginBottom:12, borderBottom:"2px solid #1565c0", paddingBottom:8}}>
-              👥 STAFF SALARIES
-            </div>
-            {Object.entries(staffSalaryBreakdown).map(([role, amt]) => (
-              <div key={role} style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f0f0f0"}}>
-                <span style={{color:"#666"}}>{role}</span>
-                <span>{fmt(amt)}</span>
-              </div>
-            ))}
-            {Object.keys(staffSalaryBreakdown).length === 0 && (
-              <div style={{color:"#888", textAlign:"center", padding:"16px"}}>No staff salaries recorded</div>
-            )}
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", marginTop:8, background:"#e3f2fd", fontWeight:700}}>
-              <span>Total Staff Salaries</span>
-              <span style={{color:"#1565c0"}}>{fmt(totalStaffSalaries)}</span>
-            </div>
-          </Card>
-
-          {/* Owner Drawings Section */}
-          <Card style={{marginBottom:16}}>
-            <div style={{fontWeight:700, fontSize:16, marginBottom:12, borderBottom:"2px solid #f57f17", paddingBottom:8}}>
-              👤 OWNER'S DRAWINGS
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f0f0f0"}}>
-              <span style={{color:"#666"}}>Personal Withdrawals</span>
-              <span>{fmt(totalWithdrawals)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:"1px solid #f0f0f0"}}>
-              <span style={{color:"#666"}}>Business Investments</span>
-              <span style={{color:"#2e7d32"}}>{fmt(totalInvestments)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", marginTop:8, background:"#fff3e0", fontWeight:700}}>
-              <span>Total Drawings</span>
-              <span style={{color:"#e65100"}}>{fmt(totalOwnerDrawings)}</span>
-            </div>
-          </Card>
-
-          {/* FINAL SUMMARY */}
-          <Card style={{background:"#1a1a2e", color:"#fff"}}>
-            <div style={{fontWeight:700, fontSize:16, marginBottom:12, textAlign:"center"}}>
-              📊 PROFIT & LOSS SUMMARY
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid rgba(255,255,255,0.2)"}}>
-              <span>Total Income</span>
-              <span>{fmt(tripIncome)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:"1px solid rgba(255,255,255,0.2)"}}>
-              <span>Total Business Expenses</span>
-              <span>{fmt(totalBusinessExpenses)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"12px 0", background:"rgba(255,255,255,0.1)", marginTop:8, fontWeight:700, fontSize:14}}>
-              <span>NET BUSINESS PROFIT</span>
-              <span style={{color: netBusinessProfit >= 0 ? "#81c784" : "#ef9a9a"}}>{fmt(netBusinessProfit)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", marginTop:8, fontSize:12, color:"rgba(255,255,255,0.7)"}}>
-              <span>Owner Drawings (Personal)</span>
-              <span>{fmt(totalWithdrawals)}</span>
-            </div>
-            <div style={{display:"flex", justifyContent:"space-between", padding:"8px 0", fontSize:12, color:"rgba(255,255,255,0.7)"}}>
-              <span>Reinvested into Business</span>
-              <span style={{color:"#81c784"}}>{fmt(totalInvestments)}</span>
-            </div>
-          </Card>
-
-          {/* Cash Flow Note */}
-          <Card style={{marginTop:16, background:"#f5f5f5"}}>
-            <div style={{fontSize:12, color:"#666"}}>
-              <div style={{fontWeight:700, marginBottom:8}}>💰 Cash Flow Note:</div>
-              <div>Cash In (from cashbook): {fmt(cashIn)}</div>
-              <div>Cash Out (from cashbook): {fmt(cashOut)}</div>
-              <div style={{marginTop:4, fontSize:11}}>
-                * Profit/Loss may differ from cash flow due to credit transactions
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
-}
-// ============================================================
-// MAIN APP
-// ============================================================
-
-
 const NAV = [
-  {id:"dashboard",label:"Dashboard",icon:"🏠"},
-  {id:"trips",label:"Trips",icon:"🚚"},
-  {id:"parties",label:"Parties",icon:"🏢"},
-  {id:"transporters",label:"Transporters",icon:"🔄"},
-  {id:"cashbook",label:"Cash Book",icon:"💰"},
-  {id:"payments",label:"Payments",icon:"💳"},
-  {id:"pending",label:"Pending",icon:"⏳"},
-  {id:"invoices",label:"Invoices",icon:"🧾"},
-  {id:"trucks",label:"Trucks",icon:"🚛"},
-  {id:"drivers",label:"Drivers",icon:"👤"},
-  {id:"generalExpenses",label:"General Expenses",icon:"💰"},
-  {id:"staffSalaries",label:"Staff Salaries",icon:"👥"},
-  {id:"ownerDrawings",label:"Owner Drawings",icon:"👤"},
-  {id:"reports",label:"Reports",icon:"📊"},
-  {id:"settings",label:"Settings",icon:"⚙️"},
+  { id: "dashboard", label: "Dashboard", icon: "🏠" },
+  { id: "trips", label: "Trips", icon: "🚚" },
+  { id: "parties", label: "Parties", icon: "🏢" },
+  { id: "transporters", label: "Transporters", icon: "🔄" },
+  { id: "cashbook", label: "Cash Book", icon: "💰" },
+  { id: "payments", label: "Payments", icon: "💳" },
+  { id: "pending", label: "Pending", icon: "⏳" },
+  { id: "invoices", label: "Invoices", icon: "🧾" },
+  { id: "trucks", label: "Trucks", icon: "🚛" },
+  { id: "drivers", label: "Drivers", icon: "👤" },
+  { id: "generalExpenses", label: "General Expenses", icon: "💰" },
+  { id: "staffSalaries", label: "Staff Salaries", icon: "👥" },
+  { id: "ownerDrawings", label: "Owner Drawings", icon: "👤" },
+  { id: "reports", label: "Reports", icon: "📊" },
+  { id: "settings", label: "Settings", icon: "⚙️" },
 ];
 
+// ============================================================
+// MAIN APP COMPONENT
+// ============================================================
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(false);
-const [email, setEmail] = useState("");
-const [pass, setPass] = useState("");
-const [passErr, setPassErr] = useState(false);
-const [authLoading, setAuthLoading] = useState(true);
-const [firebaseUser, setFirebaseUser] = useState(null);
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [passErr, setPassErr] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [firebaseUser, setFirebaseUser] = useState(null);
   const [page, setPage] = useState("dashboard");
   const [pageAction, setPageAction] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
@@ -3907,176 +3005,159 @@ const [firebaseUser, setFirebaseUser] = useState(null);
   const { data, update, loading } = useStorage(firebaseUser);
 
   const login = async () => {
-  try {
-    setPassErr(false);
+    try {
+      setPassErr(false);
+      await signInWithEmailAndPassword(auth, email, pass);
+      setLoggedIn(true);
+    } catch (error) {
+      console.error(error);
+      setPassErr(true);
+    }
+  };
 
-    await signInWithEmailAndPassword(
-      auth,
-      email,
-      pass
-    );
-
-    setLoggedIn(true);
-
-  } catch (error) {
-    console.error(error);
-    setPassErr(true);
-  }
-};
-useEffect(() => {
-  const unsub = onAuthStateChanged(auth, (user) => {
-    setFirebaseUser(user);
-    setLoggedIn(!!user);
-    setAuthLoading(false);
-  });
-
-  return () => unsub();
-}, []);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      setLoggedIn(!!user);
+      setAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
 
   const navigate = (pg, action) => {
     setPage(pg);
-    setPageAction(action||null);
+    setPageAction(action || null);
   };
-if (authLoading || loading) {
-  return (
-    <div style={{
-      minHeight:"100vh",
-      display:"flex",
-      alignItems:"center",
-      justifyContent:"center",
-      fontSize:18,
-      fontWeight:700
-    }}>
-      Loading...
-    </div>
-  );
-}
+
+  if (authLoading || loading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700 }}>
+        Loading...
+      </div>
+    );
+  }
+
   if (!loggedIn) {
     return (
-      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",
-        background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)"}}>
-        <div style={{background:"#fff",borderRadius:16,padding:"2.5rem",width:380,boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-          <div style={{textAlign:"center",marginBottom:28}}>
-            <div style={{fontSize:36,marginBottom:8}}>🚛</div>
-            <div style={{fontSize:20,fontWeight:900,color:"#1a1a2e",letterSpacing:1}}>BHUKKER TRANSPORT CO.</div>
-            <div style={{fontSize:12,color:"#888",letterSpacing:1}}>CUSTOMIZED TRANSPORT SOLUTION</div>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)" }}>
+        <div style={{ background: "#fff", borderRadius: 16, padding: "2.5rem", width: 380, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>🚛</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: "#1a1a2e", letterSpacing: 1 }}>BHUKKER TRANSPORT CO.</div>
+            <div style={{ fontSize: 12, color: "#888", letterSpacing: 1 }}>CUSTOMIZED TRANSPORT SOLUTION</div>
           </div>
-          <div style={{fontSize:14,color:"#666",marginBottom:8,fontWeight:600}}>
-  Admin Login
-</div>
-
-<input
-  type="email"
-  value={email}
-  onChange={e=>{
-    setEmail(e.target.value);
-    setPassErr(false);
-  }}
-  placeholder="Enter email..."
-  style={{
-    ...inp,
-    marginBottom:8,
-    border:passErr?"2px solid #e53935":"1.5px solid #e0e0e0"
-  }}
-/>
-
-<input type="password" value={pass} onChange={e=>{setPass(e.target.value);setPassErr(false)}}
-            onKeyDown={e=>e.key==="Enter"&&login()}
-            placeholder="Enter password..." style={{...inp,marginBottom:8,
-              border:passErr?"2px solid #e53935":"1.5px solid #e0e0e0"}} />
-          {passErr&&<div style={{color:"#e53935",fontSize:13,marginBottom:8}}>Invalid email or password</div>}
-          
-          <Btn onClick={login} style={{width:"100%"}}>Login →</Btn>
+          <div style={{ fontSize: 14, color: "#666", marginBottom: 8, fontWeight: 600 }}>Admin Login</div>
+          <input
+            type="email"
+            value={email}
+            onChange={e => { setEmail(e.target.value); setPassErr(false); }}
+            placeholder="Enter email..."
+            style={{ ...inp, marginBottom: 8, border: passErr ? "2px solid #e53935" : "1.5px solid #e0e0e0" }}
+          />
+          <input
+            type="password"
+            value={pass}
+            onChange={e => { setPass(e.target.value); setPassErr(false); }}
+            onKeyDown={e => e.key === "Enter" && login()}
+            placeholder="Enter password..."
+            style={{ ...inp, marginBottom: 8, border: passErr ? "2px solid #e53935" : "1.5px solid #e0e0e0" }}
+          />
+          {passErr && <div style={{ color: "#e53935", fontSize: 13, marginBottom: 8 }}>Invalid email or password</div>}
+          <Btn onClick={login} style={{ width: "100%" }}>Login →</Btn>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{display:"flex",height:"100vh",fontFamily:"'Segoe UI',system-ui,sans-serif",background:"#f5f5f7"}}>
+    <div style={{ display: "flex", height: "100vh", fontFamily: "'Segoe UI',system-ui,sans-serif", background: "#f5f5f7" }}>
       {/* SIDEBAR */}
       <div style={{
-        width:sidebarOpen?220:64,transition:"width .2s",
-        background:"#1a1a2e",color:"#fff",display:"flex",flexDirection:"column",
-        flexShrink:0,overflow:"hidden"
+        width: sidebarOpen ? 220 : 64,
+        transition: "width .2s",
+        background: "#1a1a2e",
+        color: "#fff",
+        display: "flex",
+        flexDirection: "column",
+        flexShrink: 0,
+        overflow: "hidden"
       }}>
-        <div style={{padding:"1.25rem",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
+        <div style={{ padding: "1.25rem", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
           {sidebarOpen ? (
             <div>
-              <div style={{fontSize:13,fontWeight:900,letterSpacing:1,color:"#fff"}}>BHUKKER TRANSPORT CO.</div>
-              <div style={{fontSize:10,color:"rgba(255,255,255,0.5)",letterSpacing:0.5}}>TRANSPORT SOLUTION</div>
+              <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: 1, color: "#fff" }}>BHUKKER TRANSPORT CO.</div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", letterSpacing: 0.5 }}>TRANSPORT SOLUTION</div>
             </div>
-          ) : <div style={{fontSize:20,textAlign:"center"}}>🚛</div>}
+          ) : <div style={{ fontSize: 20, textAlign: "center" }}>🚛</div>}
         </div>
 
-        <nav style={{flex:1,overflowY:"auto",padding:"8px 0"}}>
-          {NAV.map(n=>(
-            <div key={n.id} onClick={()=>{setPage(n.id);setPageAction(null)}}
+        <nav style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+          {NAV.map(n => (
+            <div
+              key={n.id}
+              onClick={() => { setPage(n.id); setPageAction(null) }}
               style={{
-                display:"flex",alignItems:"center",gap:12,padding:"11px 16px",cursor:"pointer",
-                background:page===n.id?"rgba(255,255,255,0.12)":"transparent",
-                borderLeft:page===n.id?"3px solid #4fc3f7":"3px solid transparent",
-                transition:"all .15s",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "11px 16px",
+                cursor: "pointer",
+                background: page === n.id ? "rgba(255,255,255,0.12)" : "transparent",
+                borderLeft: page === n.id ? "3px solid #4fc3f7" : "3px solid transparent",
+                transition: "all .15s",
               }}
-              onMouseOver={e=>e.currentTarget.style.background="rgba(255,255,255,0.08)"}
-              onMouseOut={e=>e.currentTarget.style.background=page===n.id?"rgba(255,255,255,0.12)":"transparent"}
+              onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+              onMouseOut={e => e.currentTarget.style.background = page === n.id ? "rgba(255,255,255,0.12)" : "transparent"}
             >
-              <span style={{fontSize:16,minWidth:20,textAlign:"center"}}>{n.icon}</span>
-              {sidebarOpen&&<span style={{fontSize:13,fontWeight:500,whiteSpace:"nowrap",
-                color:page===n.id?"#fff":"rgba(255,255,255,0.75)"}}>{n.label}</span>}
+              <span style={{ fontSize: 16, minWidth: 20, textAlign: "center" }}>{n.icon}</span>
+              {sidebarOpen && <span style={{ fontSize: 13, fontWeight: 500, whiteSpace: "nowrap", color: page === n.id ? "#fff" : "rgba(255,255,255,0.75)" }}>{n.label}</span>}
             </div>
           ))}
         </nav>
 
-        <div style={{padding:"12px 16px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
-          <div onClick={async () => {
-          await signOut(auth);
-          setFirebaseUser(null);
-          setLoggedIn(false);
-          setEmail("");
-          setPass("");
-          setPassErr(false);
-          setPage("dashboard");
+        <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+          <div
+            onClick={async () => {
+              await signOut(auth);
+              setFirebaseUser(null);
+              setLoggedIn(false);
+              setEmail("");
+              setPass("");
+              setPassErr(false);
+              setPage("dashboard");
             }}
-            style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",
-              color:"rgba(255,255,255,0.6)",fontSize:13}}>
-            <span>🚪</span>{sidebarOpen&&"Logout"}
+            style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", color: "rgba(255,255,255,0.6)", fontSize: 13 }}
+          >
+            <span>🚪</span>{sidebarOpen && "Logout"}
           </div>
         </div>
       </div>
 
-      {/* MAIN */}
-      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+      {/* MAIN CONTENT */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {/* TOPBAR */}
-        <div style={{background:"#fff",borderBottom:"1px solid #eee",padding:"0 24px",
-          height:56,display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-          <button onClick={()=>setSidebarOpen(p=>!p)}
-            style={{border:"none",background:"none",cursor:"pointer",fontSize:20,padding:"4px 8px"}}>
-            ☰
-          </button>
-          <div style={{fontSize:13,color:"#888"}}>
-            {getMonthLabel(selectedMonth)} · Admin
-          </div>
+        <div style={{ background: "#fff", borderBottom: "1px solid #eee", padding: "0 24px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <button onClick={() => setSidebarOpen(p => !p)} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 20, padding: "4px 8px" }}>☰</button>
+          <div style={{ fontSize: 13, color: "#888" }}>{getMonthLabel(selectedMonth)} · Admin</div>
         </div>
 
-        {/* PAGE */}
-        <div style={{flex:1,overflowY:"auto",padding:"24px"}}>
-          {page==="dashboard"&&<Dashboard data={data} selectedMonth={selectedMonth}
-            setSelectedMonth={setSelectedMonth} navigate={navigate} />}
-          {page==="trips"&&<TripsPage data={data} update={update} navigate={navigate} openAdd={pageAction==="add"} />}
-          {page==="parties"&&<PartiesPage data={data} update={update} />}
-          {page==="transporters"&&<TransportersPage data={data} update={update} />}
-          {page==="cashbook"&&<CashbookPage data={data} update={update} openAdd={pageAction==="add"} />}
-          {page==="payments"&&<PaymentsPage data={data} update={update} />}
-          {page==="pending"&&<PendingPage data={data} update={update} />}
-          {page==="invoices"&&<InvoicePage data={data} update={update} />}
-          {page==="trucks"&&<TrucksPage data={data} update={update} />}
-          {page==="drivers"&&<DriversPage data={data} update={update} />}
-          {page==="reports"&&<ReportsPage data={data} />}
-          {page==="settings"&&<SettingsPage data={data} update={update} />}
-          {page==="generalExpenses"&&<GeneralExpensesPage data={data} update={update} />}
-          {page==="staffSalaries"&&<StaffSalariesPage data={data} update={update} />}
-          {page==="ownerDrawings"&&<OwnerDrawingsPage data={data} update={update} />}
+        {/* PAGE RENDERER */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
+          {page === "dashboard" && <Dashboard data={data} selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth} navigate={navigate} />}
+          {page === "trips" && <TripsPage data={data} update={update} navigate={navigate} openAdd={pageAction === "add"} />}
+          {page === "parties" && <PartiesPage data={data} update={update} />}
+          {page === "transporters" && <TransportersPage data={data} update={update} />}
+          {page === "cashbook" && <CashbookPage data={data} update={update} openAdd={pageAction === "add"} />}
+          {page === "payments" && <PaymentsPage data={data} update={update} />}
+          {page === "pending" && <PendingPage data={data} update={update} />}
+          {page === "invoices" && <InvoicePage data={data} update={update} />}
+          {page === "trucks" && <TrucksPage data={data} update={update} />}
+          {page === "drivers" && <DriversPage data={data} update={update} />}
+          {page === "reports" && <ReportsPage data={data} />}
+          {page === "settings" && <SettingsPage data={data} update={update} />}
+          {page === "generalExpenses" && <GeneralExpensesPage data={data} update={update} />}
+          {page === "staffSalaries" && <StaffSalariesPage data={data} update={update} />}
+          {page === "ownerDrawings" && <OwnerDrawingsPage data={data} update={update} />}
         </div>
       </div>
     </div>
